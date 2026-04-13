@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: maraakiz-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: maraakiz
+      POSTGRES_PASSWORD: maraakiz_dev
+      POSTGRES_DB: maraakiz
+    volumes:
+      - maraakiz_pgdata:/var/lib/postgresql/data
+
+volumes:
+  maraakiz_pgdata:
