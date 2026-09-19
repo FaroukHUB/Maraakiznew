@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Users,
   CalendarDays,
+  ClipboardCheck,
   CreditCard,
+  LayoutDashboard,
   Library,
-  Newspaper,
   LogOut,
+  Newspaper,
+  Users,
+  UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +19,8 @@ const adminNav = [
   { label: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Élèves", href: "/admin/students", icon: Users },
   { label: "Séances", href: "/admin/sessions", icon: CalendarDays },
+  { label: "Groupes", href: "/admin/groups", icon: UsersRound },
+  { label: "Assiduité", href: "/admin/attendance", icon: ClipboardCheck },
   { label: "Paiements", href: "/admin/payments", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", icon: Library },
   { label: "Blog", href: "/admin/blog", icon: Newspaper },

@@ -20,7 +20,11 @@ export {
   sessionStatusEnum,
   attendanceStatusEnum,
   CONSUMING_STATUSES,
+  ATTENDED_STATUSES,
+  MISSED_STATUSES,
+  RATED_STATUSES,
 } from "./sessions";
+export { groups, groupMembers, groupStatusEnum } from "./groups";
 export {
   sessionNotes,
   sessionResources,
@@ -41,6 +45,7 @@ import { studentProfiles } from "./student-profiles";
 import { programs } from "./programs";
 import { subscriptions } from "./subscriptions";
 import { sessions, sessionParticipants } from "./sessions";
+import { groups, groupMembers } from "./groups";
 import { sessionNotes, sessionResources } from "./session-notes";
 import { resources } from "./resources";
 import { payments } from "./payments";
@@ -60,7 +65,11 @@ import { payments } from "./payments";
 //                  │       │
 //                  │       └──N payments
 //                  │
-//                  └──N payments (cross-forfait history)
+//                  ├──N payments (cross-forfait history)
+//                  │
+//                  └──N groupMembers ──1 groups ──1 programs
+//                                            │
+//                                            └──N sessions (séances de groupe)
 
 export const usersRelations = relations(users, ({ one }) => ({
   studentProfile: one(studentProfiles, {
@@ -79,12 +88,14 @@ export const studentProfilesRelations = relations(
     subscriptions: many(subscriptions),
     payments: many(payments),
     sessionParticipations: many(sessionParticipants),
+    groupMemberships: many(groupMembers),
   })
 );
 
 export const programsRelations = relations(programs, ({ many }) => ({
   subscriptions: many(subscriptions),
   resources: many(resources),
+  groups: many(groups),
 }));
 
 export const subscriptionsRelations = relations(
@@ -107,6 +118,10 @@ export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   subscription: one(subscriptions, {
     fields: [sessions.subscriptionId],
     references: [subscriptions.id],
+  }),
+  group: one(groups, {
+    fields: [sessions.groupId],
+    references: [groups.id],
   }),
   notes: one(sessionNotes, {
     fields: [sessions.id],
@@ -151,6 +166,26 @@ export const resourcesRelations = relations(resources, ({ one }) => ({
   program: one(programs, {
     fields: [resources.programId],
     references: [programs.id],
+  }),
+}));
+
+export const groupsRelations = relations(groups, ({ one, many }) => ({
+  program: one(programs, {
+    fields: [groups.programId],
+    references: [programs.id],
+  }),
+  members: many(groupMembers),
+  sessions: many(sessions),
+}));
+
+export const groupMembersRelations = relations(groupMembers, ({ one }) => ({
+  group: one(groups, {
+    fields: [groupMembers.groupId],
+    references: [groups.id],
+  }),
+  studentProfile: one(studentProfiles, {
+    fields: [groupMembers.studentProfileId],
+    references: [studentProfiles.id],
   }),
 }));
 

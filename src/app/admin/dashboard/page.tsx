@@ -2,9 +2,10 @@ import { requireAdmin } from "@/lib/auth-utils";
 import { getStudentCount, getAllStudentsWithDetails } from "@/data/students";
 import { getWeekSessionCount, getUpcomingSessions } from "@/data/sessions";
 import { getPendingPaymentCount } from "@/data/payments";
+import { getAttendanceStats, getSessionsNeedingAttendance } from "@/data/attendance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, CalendarDays, CreditCard, AlertTriangle } from "lucide-react";
+import { Users, CalendarDays, CreditCard, AlertTriangle, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 
 function formatDate(date: Date): string {
@@ -20,14 +21,25 @@ function formatDate(date: Date): string {
 export default async function AdminDashboard() {
   await requireAdmin();
 
-  const [studentCount, weekSessions, pendingPayments, upcomingSessions, students] =
-    await Promise.all([
-      getStudentCount(),
-      getWeekSessionCount(),
-      getPendingPaymentCount(),
-      getUpcomingSessions(5),
-      getAllStudentsWithDetails(),
-    ]);
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
+  const [
+    studentCount,
+    weekSessions,
+    pendingPayments,
+    upcomingSessions,
+    students,
+    attendance,
+    sessionsToProcess,
+  ] = await Promise.all([
+    getStudentCount(),
+    getWeekSessionCount(),
+    getPendingPaymentCount(),
+    getUpcomingSessions(5),
+    getAllStudentsWithDetails(),
+    getAttendanceStats({ month: currentMonth }),
+    getSessionsNeedingAttendance(),
+  ]);
 
   const studentsNeedingRenewal = students.filter(
     (s) =>
@@ -45,7 +57,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Card>
           <CardContent className="flex items-center gap-4 pt-6">
             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -69,6 +81,28 @@ export default async function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        <Link href="/admin/attendance">
+          <Card className="h-full hover:border-primary/40 transition-colors">
+            <CardContent className="flex items-center gap-4 pt-6">
+              <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
+                <ClipboardCheck className="h-6 w-6 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Assiduité ce mois</p>
+                <p className="text-2xl font-bold">
+                  {attendance.rated > 0 ? `${attendance.rate}%` : "—"}
+                </p>
+                {sessionsToProcess.length > 0 && (
+                  <p className="text-xs text-warning-foreground">
+                    {sessionsToProcess.length} séance
+                    {sessionsToProcess.length > 1 ? "s" : ""} à traiter
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card>
           <CardContent className="flex items-center gap-4 pt-6">

@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import {
+  ClipboardCheck,
+  Menu,
+  UsersRound,
+  X,
+} from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +37,8 @@ const adminNav = [
   { label: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Élèves", href: "/admin/students", icon: Users },
   { label: "Séances", href: "/admin/sessions", icon: CalendarDays },
+  { label: "Groupes", href: "/admin/groups", icon: UsersRound },
+  { label: "Assiduité", href: "/admin/attendance", icon: ClipboardCheck },
   { label: "Paiements", href: "/admin/payments", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", icon: Library },
   { label: "Blog", href: "/admin/blog", icon: Newspaper },

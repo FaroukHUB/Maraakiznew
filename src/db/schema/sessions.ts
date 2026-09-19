@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { subscriptions } from "./subscriptions";
 import { studentProfiles } from "./student-profiles";
+import { groups } from "./groups";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -51,6 +52,10 @@ export const sessions = pgTable("sessions", {
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
   durationMinutes: integer("duration_minutes").notNull().default(60),
   status: sessionStatusEnum("status").notNull().default("planned"),
+  // Séance de groupe : sert à pré-remplir les participantes et à
+  // rattacher la séance à une classe. N'affecte pas la consommation
+  // du forfait, qui reste individuelle (voir CONSUMING_STATUSES).
+  groupId: uuid("group_id").references(() => groups.id, { onDelete: "set null" }),
   zoomLink: varchar("zoom_link", { length: 500 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -75,6 +80,30 @@ export const attendanceStatusEnum = pgEnum("attendance_status", [
   "late",
   "excused",
 ]);
+
+// ─── Règle de calcul de l'assiduité ──────────────────────
+//
+// Le taux d'assiduité est TOUJOURS calculé depuis attendanceStatus.
+// Formule : (present + late) / (present + late + absent)
+//
+// Statuts qui comptent comme une PRÉSENCE :
+//   - present → elle était là
+//   - late    → arrivée en retard, mais elle a suivi la séance
+//
+// Statuts qui comptent comme une ABSENCE :
+//   - absent  → elle n'est pas venue, sans prévenir
+//
+// Statut EXCLU du calcul :
+//   - excused → absence prévenue à l'avance. Elle ne pénalise pas
+//     l'élève, exactement comme teacher_absent ne consomme pas de
+//     séance. On la compte et on l'affiche, mais hors du taux.
+//
+// Ce commentaire fait foi. Toute query d'assiduité doit utiliser
+// ces trois constantes et rien d'autre.
+
+export const ATTENDED_STATUSES = ["present", "late"] as const;
+export const MISSED_STATUSES = ["absent"] as const;
+export const RATED_STATUSES = ["present", "late", "absent"] as const;
 
 export const sessionParticipants = pgTable("session_participants", {
   id: uuid("id").defaultRandom().primaryKey(),

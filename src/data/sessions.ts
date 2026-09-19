@@ -119,6 +119,7 @@ export async function getSessionWithFullDetails(sessionId: string) {
         },
       },
       notes: true,
+      group: true,
       participants: {
         with: { studentProfile: { with: { user: true } } },
       },

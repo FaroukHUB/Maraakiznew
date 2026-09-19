@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth-utils";
 import { getSessionWithFullDetails, getConsumedSessionCount } from "@/data/sessions";
+import { getActiveGroupsForSelect } from "@/data/groups";
 import { SESSION_STATUS_LABELS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +13,14 @@ import {
   BookOpen,
   FileText,
   Users,
+  UsersRound,
   LinkIcon,
 } from "lucide-react";
 import { StatusForm } from "./status-form";
 import { NotesForm } from "./notes-form";
 import { ResourceForm } from "./resource-form";
 import { ParticipantsForm } from "./participants-form";
+import { GroupForm } from "./group-form";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -53,6 +56,7 @@ export default async function SessionDetailPage({
   const program = sub.program;
   const consumed = await getConsumedSessionCount(sub.id);
   const isGroup = sub.sessionType === "group";
+  const activeGroups = await getActiveGroupsForSelect();
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -148,6 +152,23 @@ export default async function SessionDetailPage({
           <NotesForm
             sessionId={session.id}
             existingNotes={session.notes ?? undefined}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Groupe */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <UsersRound className="h-4 w-4" />
+            Groupe
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <GroupForm
+            sessionId={session.id}
+            currentGroup={session.group ? { id: session.group.id, name: session.group.name } : null}
+            groups={activeGroups}
           />
         </CardContent>
       </Card>
