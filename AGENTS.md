@@ -8,23 +8,28 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Règles de calcul, écrites dans le schéma
 
-Quatre règles métier vivent dans `src/db/schema/`, chacune avec un
-commentaire qui dit « Ce commentaire fait foi ». Toute query doit passer par
-les constantes et les fonctions de calcul associées, jamais recalculer à la
+Les règles métier vivent dans `src/db/schema/`, chacune avec un commentaire
+qui dit « Ce commentaire fait foi ». Toute query doit passer par les
+constantes et les fonctions de calcul associées, jamais recalculer à la
 main — la duplication a déjà été supprimée une fois, elle ne doit pas
 revenir.
 
-| Règle | Où | Constantes |
+| Règle | Où | Point d'entrée unique |
 |---|---|---|
-| Consommation d'un forfait | `sessions.ts` | `CONSUMING_STATUSES`, `CONSUMING_ATTENDANCE_STATUSES` |
-| Taux d'assiduité | `sessions.ts` | `ATTENDED_STATUSES`, `MISSED_STATUSES` |
-| Progression pédagogique | `skills.ts` | `ACQUIRED_STATUS` |
-| Répétition espacée | `memorization.ts` | `REVIEW_INTERVALS_DAYS` |
-
-Points d'entrée uniques : `getConsumedSessionCount` / `getConsumedSessionCounts`
-(`data/sessions.ts`), `stats_assiduite` → `getAttendanceStats`
-(`data/attendance.ts`), `getStudentProgress` (`data/skills.ts`),
-`getDueReviews` (`data/memorization.ts`).
+| Consommation d'un forfait | `sessions.ts` | `getConsumedSessionCount(s)` — `data/sessions.ts` |
+| Taux d'assiduité | `sessions.ts` | `getAttendanceStats` — `data/attendance.ts` |
+| Progression pédagogique | `skills.ts` | `getStudentProgress` — `data/skills.ts` |
+| Répétition espacée | `memorization.ts` | `getDueReviews` — `data/memorization.ts` |
+| Bulletin figé à la génération | `report-cards.ts` | `createReportCard` / `refreshReportCard` — `actions/report-cards.ts` |
+| Numérotation des factures | `invoices.ts` | `issueInvoice` — `actions/invoices.ts` |
+| Note d'une évaluation | `assessments.ts` | `scorePercentage` — `db/schema/assessments.ts` |
+| Mention d'un diplôme | `certificates.ts` | `mentionForScore` — `db/schema/certificates.ts` |
+| Conversion d'un prospect | `prospects.ts` | `convertProspect` — `actions/prospects.ts` |
+| Rémunération et paie | `staff.ts` | `computePayroll` — `data/staff.ts` |
+| Stock de la boutique | `shop.ts` | `createOrder` / `setOrderStatus` — `actions/shop.ts` |
+| Récompense de parrainage | `referrals.ts` | `markReferralEarned` — `actions/referrals.ts` |
+| Progression d'un cours | `courses.ts` | `getCoursesForStudent` — `data/courses.ts` |
+| Réglages de l'institut | `settings.ts` | `getSettings` / `whatsappLink` — `data/settings.ts` |
 
 ## Décisions en attente de l'institut
 

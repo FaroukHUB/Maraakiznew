@@ -5,16 +5,29 @@ import { usePathname } from "next/navigation";
 import {
   Award,
   BookMarked,
+  BookOpen,
   CalendarClock,
+  CalendarDays,
   ClipboardCheck,
+  CreditCard,
   Eye,
   FileText,
   FolderOpen,
   GraduationCap,
+  Handshake,
+  LayoutDashboard,
+  Library,
   ListChecks,
+  LogOut,
   Menu,
+  MonitorPlay,
+  Newspaper,
   Receipt,
+  Settings,
+  Store,
+  UserCircle,
   UserPlus,
+  Users,
   Users2,
   UsersRound,
   Wallet,
@@ -22,17 +35,6 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import {
-  LayoutDashboard,
-  BookOpen,
-  Library,
-  CreditCard,
-  Newspaper,
-  UserCircle,
-  Users,
-  CalendarDays,
-  LogOut,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -43,6 +45,8 @@ const studentNav = [
   { label: "Mes bulletins", href: "/student/report-cards", labelAr: "تقاريري", icon: FileText },
   { label: "Mes diplômes", href: "/student/certificates", labelAr: "شهاداتي", icon: Award },
   { label: "Ressources", href: "/student/resources", labelAr: "الموارد", icon: Library },
+  { label: "Cours en autonomie", href: "/student/courses", labelAr: "دورات", icon: MonitorPlay },
+  { label: "Boutique", href: "/student/shop", labelAr: "متجر", icon: Store },
   { label: "Paiements", href: "/student/payments", labelAr: "المدفوعات", icon: CreditCard },
   { label: "Mes factures", href: "/student/invoices", labelAr: "فواتيري", icon: Receipt },
   { label: "Actualités", href: "/student/blog", labelAr: "الأخبار", icon: Newspaper },
@@ -58,6 +62,7 @@ const adminNav = [
   { label: "Séances", href: "/admin/sessions", labelAr: "الحصص", icon: CalendarDays },
   { label: "Groupes", href: "/admin/groups", labelAr: "المجموعات", icon: UsersRound },
   { label: "Assiduité", href: "/admin/attendance", labelAr: "الحضور", icon: ClipboardCheck },
+  { label: "Matières", href: "/admin/subjects", labelAr: "المواد", icon: BookOpen },
   { label: "Référentiel", href: "/admin/skills", labelAr: "المهارات", icon: ListChecks },
   { label: "Révisions", href: "/admin/memorization", labelAr: "المراجعة", icon: BookMarked },
   { label: "Bulletins", href: "/admin/report-cards", labelAr: "التقارير", icon: FileText },
@@ -66,10 +71,14 @@ const adminNav = [
   { label: "Factures", href: "/admin/invoices", labelAr: "الفواتير", icon: Receipt },
   { label: "Paiements", href: "/admin/payments", labelAr: "المدفوعات", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", labelAr: "الموارد", icon: Library },
+  { label: "Cours interactifs", href: "/admin/courses", labelAr: "دورات تفاعلية", icon: MonitorPlay },
+  { label: "Boutique", href: "/admin/shop", labelAr: "متجر", icon: Store },
   { label: "Actualités", href: "/admin/blog", labelAr: "الأخبار", icon: Newspaper },
   { label: "Paie", href: "/admin/payroll", labelAr: "رواتب", icon: Wallet },
+  { label: "Affiliation", href: "/admin/referrals", labelAr: "الانتماء", icon: Handshake },
   { label: "Supervision", href: "/admin/supervision", labelAr: "إشراف", icon: Eye },
   { label: "Documents", href: "/admin/documents", labelAr: "وثائق", icon: FolderOpen },
+  { label: "Paramètres", href: "/admin/settings", labelAr: "الإعدادات", icon: Settings },
 ];
 
 export function MobileNav({ variant }: { variant: "student" | "admin" }) {

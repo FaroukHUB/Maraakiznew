@@ -1,5 +1,6 @@
 import { StudentSidebar } from "@/components/layout/student-sidebar";
 import { Header } from "@/components/layout/header";
+import { WhatsAppButton } from "@/components/layout/whatsapp-button";
 
 export default function StudentLayout({
   children,
@@ -13,6 +14,7 @@ export default function StudentLayout({
         <Header variant="student" />
         <main className="flex-1 p-4 lg:p-8">{children}</main>
       </div>
+      <WhatsAppButton />
     </div>
   );
 }

@@ -165,6 +165,10 @@ export async function convertProspect(
       .set({ studentProfileId: profile.id })
       .where(eq(appointments.prospectId, id));
 
+    // C'est l'inscription qui rend la récompense de parrainage acquise.
+    const { markReferralEarned } = await import("@/actions/referrals");
+    await markReferralEarned(id, profile.id);
+
     revalidatePath("/admin/prospects");
     revalidatePath("/admin/students");
     return { success: true, id: profile.id };

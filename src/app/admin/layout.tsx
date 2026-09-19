@@ -1,5 +1,6 @@
 import { AdminSidebar } from "@/components/layout/admin-sidebar";
 import { Header } from "@/components/layout/header";
+import { WhatsAppButton } from "@/components/layout/whatsapp-button";
 
 export default function AdminLayout({
   children,
@@ -13,6 +14,7 @@ export default function AdminLayout({
         <Header variant="admin" />
         <main className="flex-1 p-4 lg:p-8">{children}</main>
       </div>
+      <WhatsAppButton />
     </div>
   );
 }

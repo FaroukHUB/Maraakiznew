@@ -11,8 +11,10 @@ import {
   LayoutDashboard,
   Library,
   LogOut,
+  MonitorPlay,
   Newspaper,
   Receipt,
+  Store,
   UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,8 @@ const studentNav = [
   { label: "Mes bulletins", href: "/student/report-cards", labelAr: "تقاريري", icon: FileText },
   { label: "Mes diplômes", href: "/student/certificates", labelAr: "شهاداتي", icon: Award },
   { label: "Ressources", href: "/student/resources", labelAr: "الموارد", icon: Library },
+  { label: "Cours en autonomie", href: "/student/courses", labelAr: "دورات", icon: MonitorPlay },
+  { label: "Boutique", href: "/student/shop", labelAr: "متجر", icon: Store },
   { label: "Paiements", href: "/student/payments", labelAr: "المدفوعات", icon: CreditCard },
   { label: "Mes factures", href: "/student/invoices", labelAr: "فواتيري", icon: Receipt },
   { label: "Actualités", href: "/student/blog", labelAr: "الأخبار", icon: Newspaper },

@@ -31,6 +31,23 @@ export { reportCards, reportCardStatusEnum } from "./report-cards";
 export { invoices, invoiceStatusEnum, computeInvoiceTotal } from "./invoices";
 export { posts, postStatusEnum, slugify } from "./posts";
 export { documents, documentTypeEnum } from "./documents";
+export { settings, SETTING_KEYS } from "./settings";
+export {
+  courses,
+  lessons,
+  lessonProgress,
+  courseStatusEnum,
+  lessonTypeEnum,
+} from "./courses";
+export { shopItems, orders, shopItemStatusEnum, orderStatusEnum } from "./shop";
+export type { OrderLine } from "./shop";
+export {
+  referralCodes,
+  referrals,
+  referralStatusEnum,
+  generateReferralCode,
+} from "./referrals";
+export type { SettingKey } from "./settings";
 export {
   staffMembers,
   payrollEntries,
@@ -99,6 +116,9 @@ import { assessments, assessmentResults } from "./assessments";
 import { posts } from "./posts";
 import { documents } from "./documents";
 import { staffMembers, payrollEntries } from "./staff";
+import { shopItems, orders } from "./shop";
+import { courses, lessons, lessonProgress } from "./courses";
+import { referralCodes, referrals } from "./referrals";
 import { prospects, appointments } from "./prospects";
 import { certificates } from "./certificates";
 import { sessionNotes, sessionResources } from "./session-notes";
@@ -167,6 +187,9 @@ export const studentProfilesRelations = relations(
     certificates: many(certificates),
     appointments: many(appointments),
     documents: many(documents),
+    orders: many(orders),
+    lessonProgress: many(lessonProgress),
+    referralCode: one(referralCodes),
   })
 );
 
@@ -353,6 +376,66 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
   studentProfile: one(studentProfiles, {
     fields: [appointments.studentProfileId],
     references: [studentProfiles.id],
+  }),
+}));
+
+export const coursesRelations = relations(courses, ({ one, many }) => ({
+  program: one(programs, {
+    fields: [courses.programId],
+    references: [programs.id],
+  }),
+  lessons: many(lessons),
+}));
+
+export const lessonsRelations = relations(lessons, ({ one, many }) => ({
+  course: one(courses, {
+    fields: [lessons.courseId],
+    references: [courses.id],
+  }),
+  progress: many(lessonProgress),
+}));
+
+export const lessonProgressRelations = relations(lessonProgress, ({ one }) => ({
+  lesson: one(lessons, {
+    fields: [lessonProgress.lessonId],
+    references: [lessons.id],
+  }),
+  studentProfile: one(studentProfiles, {
+    fields: [lessonProgress.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+}));
+
+export const shopItemsRelations = relations(shopItems, () => ({}));
+
+export const ordersRelations = relations(orders, ({ one }) => ({
+  studentProfile: one(studentProfiles, {
+    fields: [orders.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+}));
+
+export const referralCodesRelations = relations(referralCodes, ({ one }) => ({
+  studentProfile: one(studentProfiles, {
+    fields: [referralCodes.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+}));
+
+export const referralsRelations = relations(referrals, ({ one }) => ({
+  referrer: one(studentProfiles, {
+    fields: [referrals.referrerProfileId],
+    references: [studentProfiles.id],
+    relationName: "referrer",
+  }),
+  referred: one(studentProfiles, {
+    fields: [referrals.referredProfileId],
+    references: [studentProfiles.id],
+    relationName: "referred",
+  }),
+  prospect: one(prospects, {
+    fields: [referrals.prospectId],
+    references: [prospects.id],
   }),
 }));
 

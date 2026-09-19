@@ -77,3 +77,30 @@ export const PAYROLL_STATUS_LABELS: Record<string, string> = {
   draft: "À payer",
   paid: "Payé",
 };
+
+export const SHOP_STATUS_LABELS: Record<string, string> = {
+  available: "Disponible",
+  out_of_stock: "Épuisé",
+  archived: "Retiré",
+};
+
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: "À régler",
+  paid: "Réglée",
+  delivered: "Remise",
+  cancelled: "Annulée",
+};
+
+export const REFERRAL_STATUS_LABELS: Record<string, string> = {
+  pending: "En attente",
+  earned: "Acquise",
+  rewarded: "Remise",
+  expired: "Sans suite",
+};
+
+export const LESSON_TYPE_LABELS: Record<string, string> = {
+  video: "Vidéo",
+  audio: "Audio",
+  text: "Texte",
+  exercise: "Exercice",
+};
