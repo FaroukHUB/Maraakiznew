@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth-utils";
 import { getSessionWithFullDetails, getConsumedSessionCount } from "@/data/sessions";
 import { getActiveGroupsForSelect } from "@/data/groups";
 import { getStudentSkillsForProgram } from "@/data/skills";
+import { getActiveStaffForSelect } from "@/data/staff";
 import { SESSION_STATUS_LABELS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import {
   BookOpen,
   FileText,
   Users,
+  Users2,
   UsersRound,
   ListChecks,
   LinkIcon,
@@ -24,6 +26,7 @@ import { ResourceForm } from "./resource-form";
 import { ParticipantsForm } from "./participants-form";
 import { GroupForm } from "./group-form";
 import { SkillsForm } from "./skills-form";
+import { StaffAssignForm } from "./staff-assign-form";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -61,6 +64,7 @@ export default async function SessionDetailPage({
   const isGroup = sub.sessionType === "group";
   const activeGroups = await getActiveGroupsForSelect();
   const programSkills = await getStudentSkillsForProgram(student.id, program.id);
+  const activeStaff = await getActiveStaffForSelect();
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -175,6 +179,23 @@ export default async function SessionDetailPage({
             studentName={student.user.name}
             programName={program.name}
             skills={programSkills}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Enseignante */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users2 className="h-4 w-4" />
+            Enseignante
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <StaffAssignForm
+            sessionId={session.id}
+            current={session.staffMemberId}
+            staff={activeStaff}
           />
         </CardContent>
       </Card>

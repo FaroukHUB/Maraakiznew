@@ -9,7 +9,9 @@ import {
   CalendarDays,
   ClipboardCheck,
   CreditCard,
+  Eye,
   FileText,
+  FolderOpen,
   GraduationCap,
   LayoutDashboard,
   Library,
@@ -19,7 +21,9 @@ import {
   Receipt,
   UserPlus,
   Users,
+  Users2,
   UsersRound,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +32,7 @@ const adminNav = [
   { label: "Élèves", href: "/admin/students", labelAr: "الطالبات", icon: Users },
   { label: "Prospects", href: "/admin/prospects", labelAr: "العملاء", icon: UserPlus },
   { label: "Rendez-vous", href: "/admin/appointments", labelAr: "المواعيد", icon: CalendarClock },
+  { label: "Ressources humaines", href: "/admin/staff", labelAr: "الموارد البشرية", icon: Users2 },
   { label: "Séances", href: "/admin/sessions", labelAr: "الحصص", icon: CalendarDays },
   { label: "Groupes", href: "/admin/groups", labelAr: "المجموعات", icon: UsersRound },
   { label: "Assiduité", href: "/admin/attendance", labelAr: "الحضور", icon: ClipboardCheck },
@@ -40,6 +45,9 @@ const adminNav = [
   { label: "Paiements", href: "/admin/payments", labelAr: "المدفوعات", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", labelAr: "الموارد", icon: Library },
   { label: "Actualités", href: "/admin/blog", labelAr: "الأخبار", icon: Newspaper },
+  { label: "Paie", href: "/admin/payroll", labelAr: "رواتب", icon: Wallet },
+  { label: "Supervision", href: "/admin/supervision", labelAr: "إشراف", icon: Eye },
+  { label: "Documents", href: "/admin/documents", labelAr: "وثائق", icon: FolderOpen },
 ];
 
 export function AdminSidebar() {

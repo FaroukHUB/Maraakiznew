@@ -3,6 +3,7 @@ import { getSessionsNeedingAttendance } from "@/data/attendance";
 import { getDueReviewCount } from "@/data/memorization";
 import { getOutstandingTotal } from "@/data/invoices";
 import { getUntouchedProspects, getPendingAppointments } from "@/data/prospects";
+import { getExpiringDocumentCount } from "@/data/documents";
 
 export type Notification = {
   label: string;
@@ -19,13 +20,15 @@ export type Notification = {
  * compteur est à zéro, la ligne disparaît.
  */
 export async function getNotifications(): Promise<Notification[]> {
-  const [attendance, reviews, invoices, prospects, appointments] = await Promise.all([
-    getSessionsNeedingAttendance(),
-    getDueReviewCount(),
-    getOutstandingTotal(),
-    getUntouchedProspects(),
-    getPendingAppointments(),
-  ]);
+  const [attendance, reviews, invoices, prospects, appointments, expiringDocs] =
+    await Promise.all([
+      getSessionsNeedingAttendance(),
+      getDueReviewCount(),
+      getOutstandingTotal(),
+      getUntouchedProspects(),
+      getPendingAppointments(),
+      getExpiringDocumentCount(),
+    ]);
 
   const items: Notification[] = [
     {
@@ -51,6 +54,12 @@ export async function getNotifications(): Promise<Notification[]> {
       count: prospects.length,
       href: "/admin/prospects",
       tone: "urgent",
+    },
+    {
+      label: "documents à renouveler",
+      count: expiringDocs,
+      href: "/admin/documents",
+      tone: "attention",
     },
     {
       label: "rendez-vous à trancher",

@@ -11,6 +11,7 @@ import {
 import { subscriptions } from "./subscriptions";
 import { studentProfiles } from "./student-profiles";
 import { groups } from "./groups";
+import { staffMembers } from "./staff";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -82,6 +83,12 @@ export const sessions = pgTable("sessions", {
   // rattacher la séance à une classe. N'affecte pas la consommation
   // du forfait, qui reste individuelle (voir CONSUMING_STATUSES).
   groupId: uuid("group_id").references(() => groups.id, { onDelete: "set null" }),
+  // Qui a donné la séance. Nullable : les séances antérieures à la gestion
+  // du personnel n'ont pas d'enseignante renseignée, et une séance peut
+  // être planifiée avant d'être attribuée.
+  staffMemberId: uuid("staff_member_id").references(() => staffMembers.id, {
+    onDelete: "set null",
+  }),
   zoomLink: varchar("zoom_link", { length: 500 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

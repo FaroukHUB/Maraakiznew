@@ -56,3 +56,24 @@ export const APPOINTMENT_STATUS_LABELS: Record<string, string> = {
   cancelled: "Annulé",
   no_show: "Absente",
 };
+
+export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  contract: "Contrat d'inscription",
+  authorization: "Autorisation",
+  identity: "Pièce d'identité",
+  medical: "Certificat médical",
+  other: "Autre",
+};
+
+export const STAFF_ROLE_LABELS: Record<string, string> = {
+  teacher: "Enseignante",
+  secretary: "Secrétariat",
+  supervisor: "Superviseure",
+  pedagogical_lead: "Responsable pédagogique",
+  manager: "Gestionnaire",
+};
+
+export const PAYROLL_STATUS_LABELS: Record<string, string> = {
+  draft: "À payer",
+  paid: "Payé",
+};

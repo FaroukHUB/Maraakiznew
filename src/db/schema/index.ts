@@ -30,6 +30,14 @@ export { skills, skillProgress, skillStatusEnum, ACQUIRED_STATUS } from "./skill
 export { reportCards, reportCardStatusEnum } from "./report-cards";
 export { invoices, invoiceStatusEnum, computeInvoiceTotal } from "./invoices";
 export { posts, postStatusEnum, slugify } from "./posts";
+export { documents, documentTypeEnum } from "./documents";
+export {
+  staffMembers,
+  payrollEntries,
+  staffRoleEnum,
+  staffStatusEnum,
+  payrollStatusEnum,
+} from "./staff";
 export {
   prospects,
   appointments,
@@ -89,6 +97,8 @@ import { reportCards } from "./report-cards";
 import { invoices } from "./invoices";
 import { assessments, assessmentResults } from "./assessments";
 import { posts } from "./posts";
+import { documents } from "./documents";
+import { staffMembers, payrollEntries } from "./staff";
 import { prospects, appointments } from "./prospects";
 import { certificates } from "./certificates";
 import { sessionNotes, sessionResources } from "./session-notes";
@@ -156,6 +166,7 @@ export const studentProfilesRelations = relations(
     assessmentResults: many(assessmentResults),
     certificates: many(certificates),
     appointments: many(appointments),
+    documents: many(documents),
   })
 );
 
@@ -192,6 +203,10 @@ export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   group: one(groups, {
     fields: [sessions.groupId],
     references: [groups.id],
+  }),
+  staffMember: one(staffMembers, {
+    fields: [sessions.staffMemberId],
+    references: [staffMembers.id],
   }),
   notes: one(sessionNotes, {
     fields: [sessions.id],
@@ -337,6 +352,35 @@ export const appointmentsRelations = relations(appointments, ({ one }) => ({
   }),
   studentProfile: one(studentProfiles, {
     fields: [appointments.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+}));
+
+export const staffMembersRelations = relations(staffMembers, ({ one, many }) => ({
+  user: one(users, {
+    fields: [staffMembers.userId],
+    references: [users.id],
+  }),
+  supervisor: one(staffMembers, {
+    fields: [staffMembers.supervisorId],
+    references: [staffMembers.id],
+    relationName: "supervision",
+  }),
+  supervised: many(staffMembers, { relationName: "supervision" }),
+  sessions: many(sessions),
+  payroll: many(payrollEntries),
+}));
+
+export const payrollEntriesRelations = relations(payrollEntries, ({ one }) => ({
+  staffMember: one(staffMembers, {
+    fields: [payrollEntries.staffMemberId],
+    references: [staffMembers.id],
+  }),
+}));
+
+export const documentsRelations = relations(documents, ({ one }) => ({
+  studentProfile: one(studentProfiles, {
+    fields: [documents.studentProfileId],
     references: [studentProfiles.id],
   }),
 }));
