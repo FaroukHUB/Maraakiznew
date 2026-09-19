@@ -18,6 +18,7 @@ async function seed() {
   console.log("Seeding database...");
 
   // ─── Clean existing data (reverse FK order) ──────────
+  await db.delete(schema.reportCards);
   await db.delete(schema.memorizationReviews);
   await db.delete(schema.memorizationItems);
   await db.delete(schema.skillProgress);
@@ -620,6 +621,62 @@ async function seed() {
   ]);
 
   console.log("  Memorization items created (4).");
+
+  // ─── Report cards ────────────────────────────────────
+  // Un bulletin publié et un brouillon, pour que les deux écrans aient
+  // du contenu. Les chiffres sont volontairement figés, comme le veut la
+  // règle du bulletin (voir schema/report-cards.ts).
+  await db.insert(schema.reportCards).values([
+    {
+      studentProfileId: profiles[0].id,
+      title: "Bulletin du 1er trimestre",
+      periodStart: new Date(relative(-120)),
+      periodEnd: new Date(relative(-30)),
+      status: "published" as const,
+      publishedAt: relative(-25),
+      generalComment:
+        "Travail régulier et sérieux. La lecture des lettres attachées est acquise, il reste à gagner en fluidité sur les prolongations. Assiduité exemplaire.",
+      sessionsCount: 6,
+      attendanceAttended: 6,
+      attendanceMissed: 0,
+      attendanceExcused: 0,
+      attendanceRate: 100,
+      skillsAcquired: 4,
+      skillsTotal: 12,
+      skillsAcquiredInPeriod: 4,
+      programProgress: [
+        { programId: nourania.id, programName: "Nourania", acquired: 4, total: 12, rate: 33.3 },
+      ],
+      memorizedAyahs: 10,
+      memorizedPortionsInPeriod: 2,
+      reviewsInPeriod: 5,
+      generatedAt: relative(-25),
+    },
+    {
+      studentProfileId: profiles[1].id,
+      title: "Bulletin du 1er trimestre",
+      periodStart: new Date(relative(-120)),
+      periodEnd: new Date(relative(-30)),
+      status: "draft" as const,
+      sessionsCount: 5,
+      attendanceAttended: 4,
+      attendanceMissed: 1,
+      attendanceExcused: 0,
+      attendanceRate: 80,
+      skillsAcquired: 2,
+      skillsTotal: 12,
+      skillsAcquiredInPeriod: 2,
+      programProgress: [
+        { programId: nourania.id, programName: "Nourania", acquired: 2, total: 12, rate: 16.7 },
+      ],
+      memorizedAyahs: 30,
+      memorizedPortionsInPeriod: 1,
+      reviewsInPeriod: 2,
+      generatedAt: relative(-25),
+    },
+  ]);
+
+  console.log("  Report cards created (2).");
 
   // ─── Done ────────────────────────────────────────────
   console.log("\nSeed complete.");

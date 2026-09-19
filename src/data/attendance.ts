@@ -1,4 +1,4 @@
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   sessions,
@@ -27,6 +27,8 @@ export type StudentAttendance = AttendanceStats & {
 type Filters = {
   groupId?: string;
   month?: string; // "2026-04"
+  from?: Date; // borne incluse
+  to?: Date; // borne incluse
 };
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -49,6 +51,12 @@ function attendanceConditions(filters: Filters = {}) {
   }
   if (filters.month) {
     conditions.push(sql`to_char(${sessions.scheduledAt}, 'YYYY-MM') = ${filters.month}`);
+  }
+  if (filters.from) {
+    conditions.push(gte(sessions.scheduledAt, filters.from));
+  }
+  if (filters.to) {
+    conditions.push(lte(sessions.scheduledAt, filters.to));
   }
 
   return and(...conditions);

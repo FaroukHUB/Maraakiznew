@@ -27,6 +27,8 @@ export {
 } from "./sessions";
 export { groups, groupMembers, groupStatusEnum } from "./groups";
 export { skills, skillProgress, skillStatusEnum, ACQUIRED_STATUS } from "./skills";
+export { reportCards, reportCardStatusEnum } from "./report-cards";
+export type { ProgramProgressSnapshot } from "./report-cards";
 export {
   memorizationItems,
   memorizationReviews,
@@ -58,6 +60,7 @@ import { sessions, sessionParticipants } from "./sessions";
 import { groups, groupMembers } from "./groups";
 import { skills, skillProgress } from "./skills";
 import { memorizationItems, memorizationReviews } from "./memorization";
+import { reportCards } from "./report-cards";
 import { sessionNotes, sessionResources } from "./session-notes";
 import { resources } from "./resources";
 import { payments } from "./payments";
@@ -85,7 +88,9 @@ import { payments } from "./payments";
 //                  │
 //                  ├──N skillProgress ──1 skills ──1 programs (référentiel)
 //                  │
-//                  └──N memorizationItems ──N memorizationReviews (hifz)
+//                  ├──N memorizationItems ──N memorizationReviews (hifz)
+//                  │
+//                  └──N reportCards (constats datés)
 
 export const usersRelations = relations(users, ({ one }) => ({
   studentProfile: one(studentProfiles, {
@@ -107,6 +112,7 @@ export const studentProfilesRelations = relations(
     groupMemberships: many(groupMembers),
     skillProgress: many(skillProgress),
     memorization: many(memorizationItems),
+    reportCards: many(reportCards),
   })
 );
 
@@ -260,6 +266,13 @@ export const memorizationReviewsRelations = relations(
     }),
   })
 );
+
+export const reportCardsRelations = relations(reportCards, ({ one }) => ({
+  studentProfile: one(studentProfiles, {
+    fields: [reportCards.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+}));
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   subscription: one(subscriptions, {

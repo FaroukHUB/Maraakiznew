@@ -3,19 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   BookOpen,
-  Library,
   CreditCard,
+  FileText,
+  LayoutDashboard,
+  Library,
+  LogOut,
   Newspaper,
   UserCircle,
-  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const studentNav = [
   { label: "Tableau de bord", href: "/student/dashboard", icon: LayoutDashboard },
   { label: "Mes séances", href: "/student/sessions", icon: BookOpen },
+  { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
   { label: "Ressources", href: "/student/resources", icon: Library },
   { label: "Paiements", href: "/student/payments", icon: CreditCard },
   { label: "Blog & Conseils", href: "/student/blog", icon: Newspaper },

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BookMarked,
   ClipboardCheck,
+  FileText,
   ListChecks,
   Menu,
   UsersRound,
@@ -29,6 +30,7 @@ import { useState } from "react";
 const studentNav = [
   { label: "Tableau de bord", href: "/student/dashboard", icon: LayoutDashboard },
   { label: "Mes séances", href: "/student/sessions", icon: BookOpen },
+  { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
   { label: "Ressources", href: "/student/resources", icon: Library },
   { label: "Paiements", href: "/student/payments", icon: CreditCard },
   { label: "Blog & Conseils", href: "/student/blog", icon: Newspaper },
@@ -43,6 +45,7 @@ const adminNav = [
   { label: "Assiduité", href: "/admin/attendance", icon: ClipboardCheck },
   { label: "Référentiel", href: "/admin/skills", icon: ListChecks },
   { label: "Révisions", href: "/admin/memorization", icon: BookMarked },
+  { label: "Bulletins", href: "/admin/report-cards", icon: FileText },
   { label: "Paiements", href: "/admin/payments", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", icon: Library },
   { label: "Blog", href: "/admin/blog", icon: Newspaper },
