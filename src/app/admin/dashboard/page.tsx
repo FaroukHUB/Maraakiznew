@@ -3,9 +3,10 @@ import { getStudentCount, getAllStudentsWithDetails } from "@/data/students";
 import { getWeekSessionCount, getUpcomingSessions } from "@/data/sessions";
 import { getPendingPaymentCount } from "@/data/payments";
 import { getAttendanceStats, getSessionsNeedingAttendance } from "@/data/attendance";
+import { getAverageProgressByProgram } from "@/data/skills";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, CalendarDays, CreditCard, AlertTriangle, ClipboardCheck } from "lucide-react";
+import { Users, CalendarDays, CreditCard, AlertTriangle, ClipboardCheck, ListChecks } from "lucide-react";
 import Link from "next/link";
 
 function formatDate(date: Date): string {
@@ -31,6 +32,7 @@ export default async function AdminDashboard() {
     students,
     attendance,
     sessionsToProcess,
+    progressByProgram,
   ] = await Promise.all([
     getStudentCount(),
     getWeekSessionCount(),
@@ -39,6 +41,7 @@ export default async function AdminDashboard() {
     getAllStudentsWithDetails(),
     getAttendanceStats({ month: currentMonth }),
     getSessionsNeedingAttendance(),
+    getAverageProgressByProgram(),
   ]);
 
   const studentsNeedingRenewal = students.filter(
@@ -130,6 +133,62 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Progression par programme */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <ListChecks className="h-4 w-4" />
+                Progression par programme
+              </span>
+              <Link
+                href="/admin/skills"
+                className="text-sm text-primary hover:underline font-normal"
+              >
+                Référentiel
+              </Link>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Moyenne des élèves avec un forfait actif
+            </p>
+          </CardHeader>
+          <CardContent>
+            {progressByProgram.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                Aucun forfait actif.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {progressByProgram.map((program) => (
+                  <div key={program.programId}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium">{program.programName}</span>
+                      <span className="text-sm font-bold">
+                        {program.total > 0 ? `${program.rate}%` : "—"}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${program.rate}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {program.total === 0
+                        ? "Référentiel vide"
+                        : `${program.total} compétence${
+                            program.total > 1 ? "s" : ""
+                          } · ${program.studentCount} élève${
+                            program.studentCount > 1 ? "s" : ""
+                          }`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Upcoming sessions */}
         <Card>
           <CardHeader>

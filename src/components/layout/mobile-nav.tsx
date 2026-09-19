@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ClipboardCheck,
+  ListChecks,
   Menu,
   UsersRound,
   X,
@@ -39,6 +40,7 @@ const adminNav = [
   { label: "Séances", href: "/admin/sessions", icon: CalendarDays },
   { label: "Groupes", href: "/admin/groups", icon: UsersRound },
   { label: "Assiduité", href: "/admin/attendance", icon: ClipboardCheck },
+  { label: "Référentiel", href: "/admin/skills", icon: ListChecks },
   { label: "Paiements", href: "/admin/payments", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", icon: Library },
   { label: "Blog", href: "/admin/blog", icon: Newspaper },

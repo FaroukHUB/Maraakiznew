@@ -18,6 +18,10 @@ async function seed() {
   console.log("Seeding database...");
 
   // ─── Clean existing data (reverse FK order) ──────────
+  await db.delete(schema.skillProgress);
+  await db.delete(schema.skills);
+  await db.delete(schema.groupMembers);
+  await db.delete(schema.groups);
   await db.delete(schema.sessionResources);
   await db.delete(schema.sessionNotes);
   await db.delete(schema.sessionParticipants);
@@ -55,6 +59,56 @@ async function seed() {
     .returning();
 
   console.log("  Programs created.");
+
+  // ─── Skills (référentiel) ────────────────────────────
+  // Jeu de départ, à adapter au programme réel de l'institut.
+  // Le référentiel se modifie ensuite depuis /admin/skills.
+  const nouraniaSkills = [
+    ["Les lettres isolées", "Reconnaître et nommer les 28 lettres"],
+    ["Les lettres isolées", "Prononcer chaque lettre avec son point d'articulation"],
+    ["Les formes des lettres", "Identifier les formes initiale, médiane et finale"],
+    ["Les formes des lettres", "Lire un mot en lettres attachées"],
+    ["Les voyelles courtes", "Lire une lettre avec la fatha"],
+    ["Les voyelles courtes", "Lire une lettre avec la kasra"],
+    ["Les voyelles courtes", "Lire une lettre avec la damma"],
+    ["Le tanwin", "Lire les trois tanwin"],
+    ["Le soukoun", "Lire une lettre porteuse du soukoun"],
+    ["La chadda", "Lire une lettre redoublée"],
+    ["Les prolongations", "Distinguer et allonger les trois madd"],
+    ["Lecture suivie", "Lire une ligne complète sans hésiter"],
+  ];
+
+  const quranSkills = [
+    ["Règles de nun sakinah", "Al-Idhhar"],
+    ["Règles de nun sakinah", "Al-Idgham"],
+    ["Règles de nun sakinah", "Al-Iqlab"],
+    ["Règles de nun sakinah", "Al-Ikhfa"],
+    ["Les madd", "Madd tabi'i"],
+    ["Les madd", "Madd muttasil et munfasil"],
+    ["Fluidité", "Lire une page en respectant les arrêts"],
+    ["Mémorisation", "Réciter la sourate travaillée sans erreur"],
+  ];
+
+  await db.insert(schema.skills).values([
+    ...nouraniaSkills.map(([unit, label], index) => ({
+      programId: nourania.id,
+      unit,
+      code: `N${index + 1}`,
+      label,
+      sortOrder: index,
+    })),
+    ...quranSkills.map(([unit, label], index) => ({
+      programId: quranAccompaniment.id,
+      unit,
+      code: `C${index + 1}`,
+      label,
+      sortOrder: index,
+    })),
+  ]);
+
+  console.log(
+    `  Skills created (${nouraniaSkills.length + quranSkills.length}).`
+  );
 
   // ─── Users ───────────────────────────────────────────
   const adminHash = await hash("admin123", 10);

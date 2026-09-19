@@ -25,6 +25,7 @@ export {
   RATED_STATUSES,
 } from "./sessions";
 export { groups, groupMembers, groupStatusEnum } from "./groups";
+export { skills, skillProgress, skillStatusEnum, ACQUIRED_STATUS } from "./skills";
 export {
   sessionNotes,
   sessionResources,
@@ -46,6 +47,7 @@ import { programs } from "./programs";
 import { subscriptions } from "./subscriptions";
 import { sessions, sessionParticipants } from "./sessions";
 import { groups, groupMembers } from "./groups";
+import { skills, skillProgress } from "./skills";
 import { sessionNotes, sessionResources } from "./session-notes";
 import { resources } from "./resources";
 import { payments } from "./payments";
@@ -67,9 +69,11 @@ import { payments } from "./payments";
 //                  │
 //                  ├──N payments (cross-forfait history)
 //                  │
-//                  └──N groupMembers ──1 groups ──1 programs
-//                                            │
-//                                            └──N sessions (séances de groupe)
+//                  ├──N groupMembers ──1 groups ──1 programs
+//                  │                         │
+//                  │                         └──N sessions (séances de groupe)
+//                  │
+//                  └──N skillProgress ──1 skills ──1 programs (référentiel)
 
 export const usersRelations = relations(users, ({ one }) => ({
   studentProfile: one(studentProfiles, {
@@ -89,6 +93,7 @@ export const studentProfilesRelations = relations(
     payments: many(payments),
     sessionParticipations: many(sessionParticipants),
     groupMemberships: many(groupMembers),
+    skillProgress: many(skillProgress),
   })
 );
 
@@ -96,6 +101,7 @@ export const programsRelations = relations(programs, ({ many }) => ({
   subscriptions: many(subscriptions),
   resources: many(resources),
   groups: many(groups),
+  skills: many(skills),
 }));
 
 export const subscriptionsRelations = relations(
@@ -186,6 +192,29 @@ export const groupMembersRelations = relations(groupMembers, ({ one }) => ({
   studentProfile: one(studentProfiles, {
     fields: [groupMembers.studentProfileId],
     references: [studentProfiles.id],
+  }),
+}));
+
+export const skillsRelations = relations(skills, ({ one, many }) => ({
+  program: one(programs, {
+    fields: [skills.programId],
+    references: [programs.id],
+  }),
+  progress: many(skillProgress),
+}));
+
+export const skillProgressRelations = relations(skillProgress, ({ one }) => ({
+  skill: one(skills, {
+    fields: [skillProgress.skillId],
+    references: [skills.id],
+  }),
+  studentProfile: one(studentProfiles, {
+    fields: [skillProgress.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+  session: one(sessions, {
+    fields: [skillProgress.sessionId],
+    references: [sessions.id],
   }),
 }));
 

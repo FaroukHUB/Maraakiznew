@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth-utils";
 import { getStudentFullProfile } from "@/data/students";
 import { getConsumedSessionCount } from "@/data/sessions";
+import { getStudentProgress, getStudentSkillsForProgram } from "@/data/skills";
 import {
   LEVEL_LABELS,
   SESSION_STATUS_LABELS,
@@ -15,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { EditProfileForm } from "./edit-form";
 import { CloseSubscriptionButton } from "./close-subscription-button";
+import { ProgressSection } from "./progress-section";
 import { Button } from "@/components/ui/button";
 import {
   User,
@@ -26,6 +28,7 @@ import {
   CalendarDays,
   FileText,
   Users,
+  ListChecks,
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
@@ -87,6 +90,15 @@ export default async function StudentProfilePage({
   if (!student) notFound();
 
   const user = student.user;
+
+  // Progression : un bloc par programme suivi, avec son référentiel
+  const progressByProgram = await getStudentProgress(id);
+  const progressBlocks = await Promise.all(
+    progressByProgram.map(async (program) => ({
+      ...program,
+      skills: await getStudentSkillsForProgram(id, program.programId),
+    }))
+  );
 
   // Compute consumed counts per subscription
   const subsWithCounts = await Promise.all(
@@ -318,6 +330,19 @@ export default async function StudentProfilePage({
           </CardContent>
         </Card>
       ))}
+
+      {/* Progression pédagogique */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ListChecks className="h-4 w-4" />
+            Progression
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProgressSection studentProfileId={id} programs={progressBlocks} />
+        </CardContent>
+      </Card>
 
       {/* Group participations */}
       {groupParticipations.length > 0 && (

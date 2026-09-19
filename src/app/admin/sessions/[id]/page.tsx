@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth-utils";
 import { getSessionWithFullDetails, getConsumedSessionCount } from "@/data/sessions";
 import { getActiveGroupsForSelect } from "@/data/groups";
+import { getStudentSkillsForProgram } from "@/data/skills";
 import { SESSION_STATUS_LABELS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import {
   FileText,
   Users,
   UsersRound,
+  ListChecks,
   LinkIcon,
 } from "lucide-react";
 import { StatusForm } from "./status-form";
@@ -21,6 +23,7 @@ import { NotesForm } from "./notes-form";
 import { ResourceForm } from "./resource-form";
 import { ParticipantsForm } from "./participants-form";
 import { GroupForm } from "./group-form";
+import { SkillsForm } from "./skills-form";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -57,6 +60,7 @@ export default async function SessionDetailPage({
   const consumed = await getConsumedSessionCount(sub.id);
   const isGroup = sub.sessionType === "group";
   const activeGroups = await getActiveGroupsForSelect();
+  const programSkills = await getStudentSkillsForProgram(student.id, program.id);
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -152,6 +156,25 @@ export default async function SessionDetailPage({
           <NotesForm
             sessionId={session.id}
             existingNotes={session.notes ?? undefined}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Acquis travaillés pendant la séance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ListChecks className="h-4 w-4" />
+            Acquis
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SkillsForm
+            sessionId={session.id}
+            studentProfileId={student.id}
+            studentName={student.user.name}
+            programName={program.name}
+            skills={programSkills}
           />
         </CardContent>
       </Card>
