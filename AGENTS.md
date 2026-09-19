@@ -55,8 +55,40 @@ revenir.
    rattache les participations antérieures à la consommation collective.
    À lancer après sauvegarde — il peut faire dépasser des forfaits.
 
+## Déploiement et base de données
+
+`vercel-build` applique les migrations **avant** de construire. Deux règles,
+tenues par `src/db/migrate.ts` :
+
+1. **Les migrations sont additives.** Le lanceur refuse tout fichier
+   contenant `DROP`, `TRUNCATE`, `DELETE FROM`, un `DROP COLUMN` /
+   `CONSTRAINT` / `DEFAULT`, ou un changement de type de colonne — avant
+   même d'ouvrir la connexion. Une suppression se fait à la main, après
+   sauvegarde, jamais depuis un build. Ce commentaire fait foi.
+2. **Un fichier, une transaction.** S'il échoue au milieu, rien n'est
+   appliqué et le build s'arrête.
+
+Pour ajouter une migration : écrire `drizzle/NNNN_nom.sql` en
+`CREATE ... IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, et poser chaque
+contrainte sous `IF NOT EXISTS (SELECT 1 FROM pg_constraint ...)`. Une clé
+primaire se teste par `contype = 'p'` sur la table, pas par son nom : la
+reposer sous un autre nom échoue. Vérifier ensuite l'idempotence en
+appliquant le fichier trois fois de suite sur une base vide.
+
+**Sur ce projet Vercel, les environnements `production`, `preview` et
+`development` partagent le même `DATABASE_URL`.** Un déploiement de
+préversion migre donc la base de production. C'est la raison pour laquelle
+les migrations sont additives.
+
+`npm run db:seed` **efface tout** avant de repeupler. Il ne doit jamais
+être lancé sur la base partagée sans décision explicite de l'institut.
+
 ## Vérification locale
 
 PostgreSQL est requis (`docker-compose.yml`). Avant de pousser :
 `npx tsc --noEmit`, `npm run lint`, `npx next build`.
 Une seule erreur de lint préexiste, dans `src/app/admin/subscriptions/new/form.tsx`.
+
+La recette au navigateur passe par les 47 pages d'administration et les 15
+pages élève, et vérifie dans les deux sens que l'espace administration est
+fermé aux élèves et l'espace élève aux visiteuses non connectées.
