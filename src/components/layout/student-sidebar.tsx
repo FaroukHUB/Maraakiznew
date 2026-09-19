@@ -18,23 +18,23 @@ import {
 import { cn } from "@/lib/utils";
 
 const studentNav = [
-  { label: "Tableau de bord", href: "/student/dashboard", icon: LayoutDashboard },
-  { label: "Mes séances", href: "/student/sessions", icon: BookOpen },
-  { label: "Mes évaluations", href: "/student/assessments", icon: GraduationCap },
-  { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
-  { label: "Mes diplômes", href: "/student/certificates", icon: Award },
-  { label: "Ressources", href: "/student/resources", icon: Library },
-  { label: "Paiements", href: "/student/payments", icon: CreditCard },
-  { label: "Mes factures", href: "/student/invoices", icon: Receipt },
-  { label: "Actualités", href: "/student/blog", icon: Newspaper },
-  { label: "Mon profil", href: "/student/profile", icon: UserCircle },
+  { label: "Tableau de bord", href: "/student/dashboard", labelAr: "لوحة القيادة", icon: LayoutDashboard },
+  { label: "Mes séances", href: "/student/sessions", labelAr: "حصصي", icon: BookOpen },
+  { label: "Mes évaluations", href: "/student/assessments", labelAr: "تقييماتي", icon: GraduationCap },
+  { label: "Mes bulletins", href: "/student/report-cards", labelAr: "تقاريري", icon: FileText },
+  { label: "Mes diplômes", href: "/student/certificates", labelAr: "شهاداتي", icon: Award },
+  { label: "Ressources", href: "/student/resources", labelAr: "الموارد", icon: Library },
+  { label: "Paiements", href: "/student/payments", labelAr: "المدفوعات", icon: CreditCard },
+  { label: "Mes factures", href: "/student/invoices", labelAr: "فواتيري", icon: Receipt },
+  { label: "Actualités", href: "/student/blog", labelAr: "الأخبار", icon: Newspaper },
+  { label: "Mon profil", href: "/student/profile", labelAr: "ملفي", icon: UserCircle },
 ];
 
 export function StudentSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r border-border bg-sidebar min-h-screen">
+    <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:border-r border-border bg-sidebar min-h-screen">
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-border">
         <Link href="/student/dashboard" className="flex items-center gap-2">
@@ -52,14 +52,23 @@ export function StudentSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
               )}
             >
-              <item.icon className="h-5 w-5" />
-              {item.label}
+              <item.icon className="h-5 w-5 shrink-0" />
+              <span className="flex-1 whitespace-nowrap">{item.label}</span>
+              {item.labelAr && (
+                <span
+                  dir="rtl"
+                  lang="ar"
+                  className="text-xs text-sidebar-foreground/40 shrink-0 truncate max-w-24"
+                >
+                  {item.labelAr}
+                </span>
+              )}
             </Link>
           );
         })}

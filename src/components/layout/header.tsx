@@ -1,10 +1,15 @@
 import { auth } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MobileNav } from "./mobile-nav";
+import { DateClock } from "./date-clock";
+import { NotificationsBell } from "./notifications-bell";
+import { getNotifications } from "@/data/notifications";
 
 export async function Header({ variant }: { variant: "student" | "admin" }) {
   const session = await auth();
   const user = session?.user;
+  // Les files de travail ne concernent que l'enseignante.
+  const notifications = variant === "admin" ? await getNotifications() : [];
   const initials = user?.name
     ? user.name
         .split(" ")
@@ -23,6 +28,8 @@ export async function Header({ variant }: { variant: "student" | "admin" }) {
       </div>
 
       <div className="flex items-center gap-3">
+        <DateClock />
+        {variant === "admin" && <NotificationsBell items={notifications} />}
         <span className="text-sm text-muted-foreground hidden sm:inline">
           {user?.name}
         </span>

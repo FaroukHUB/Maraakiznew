@@ -33,35 +33,35 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 const studentNav = [
-  { label: "Tableau de bord", href: "/student/dashboard", icon: LayoutDashboard },
-  { label: "Mes séances", href: "/student/sessions", icon: BookOpen },
-  { label: "Mes évaluations", href: "/student/assessments", icon: GraduationCap },
-  { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
-  { label: "Mes diplômes", href: "/student/certificates", icon: Award },
-  { label: "Ressources", href: "/student/resources", icon: Library },
-  { label: "Paiements", href: "/student/payments", icon: CreditCard },
-  { label: "Mes factures", href: "/student/invoices", icon: Receipt },
-  { label: "Actualités", href: "/student/blog", icon: Newspaper },
-  { label: "Mon profil", href: "/student/profile", icon: UserCircle },
+  { label: "Tableau de bord", href: "/student/dashboard", labelAr: "لوحة القيادة", icon: LayoutDashboard },
+  { label: "Mes séances", href: "/student/sessions", labelAr: "حصصي", icon: BookOpen },
+  { label: "Mes évaluations", href: "/student/assessments", labelAr: "تقييماتي", icon: GraduationCap },
+  { label: "Mes bulletins", href: "/student/report-cards", labelAr: "تقاريري", icon: FileText },
+  { label: "Mes diplômes", href: "/student/certificates", labelAr: "شهاداتي", icon: Award },
+  { label: "Ressources", href: "/student/resources", labelAr: "الموارد", icon: Library },
+  { label: "Paiements", href: "/student/payments", labelAr: "المدفوعات", icon: CreditCard },
+  { label: "Mes factures", href: "/student/invoices", labelAr: "فواتيري", icon: Receipt },
+  { label: "Actualités", href: "/student/blog", labelAr: "الأخبار", icon: Newspaper },
+  { label: "Mon profil", href: "/student/profile", labelAr: "ملفي", icon: UserCircle },
 ];
 
 const adminNav = [
-  { label: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Élèves", href: "/admin/students", icon: Users },
-  { label: "Prospects", href: "/admin/prospects", icon: UserPlus },
-  { label: "Rendez-vous", href: "/admin/appointments", icon: CalendarClock },
-  { label: "Séances", href: "/admin/sessions", icon: CalendarDays },
-  { label: "Groupes", href: "/admin/groups", icon: UsersRound },
-  { label: "Assiduité", href: "/admin/attendance", icon: ClipboardCheck },
-  { label: "Référentiel", href: "/admin/skills", icon: ListChecks },
-  { label: "Révisions", href: "/admin/memorization", icon: BookMarked },
-  { label: "Bulletins", href: "/admin/report-cards", icon: FileText },
-  { label: "Diplômes", href: "/admin/certificates", icon: Award },
-  { label: "Évaluations", href: "/admin/assessments", icon: GraduationCap },
-  { label: "Factures", href: "/admin/invoices", icon: Receipt },
-  { label: "Paiements", href: "/admin/payments", icon: CreditCard },
-  { label: "Ressources", href: "/admin/resources", icon: Library },
-  { label: "Actualités", href: "/admin/blog", icon: Newspaper },
+  { label: "Tableau de bord", href: "/admin/dashboard", labelAr: "لوحة القيادة", icon: LayoutDashboard },
+  { label: "Élèves", href: "/admin/students", labelAr: "الطالبات", icon: Users },
+  { label: "Prospects", href: "/admin/prospects", labelAr: "العملاء", icon: UserPlus },
+  { label: "Rendez-vous", href: "/admin/appointments", labelAr: "المواعيد", icon: CalendarClock },
+  { label: "Séances", href: "/admin/sessions", labelAr: "الحصص", icon: CalendarDays },
+  { label: "Groupes", href: "/admin/groups", labelAr: "المجموعات", icon: UsersRound },
+  { label: "Assiduité", href: "/admin/attendance", labelAr: "الحضور", icon: ClipboardCheck },
+  { label: "Référentiel", href: "/admin/skills", labelAr: "المهارات", icon: ListChecks },
+  { label: "Révisions", href: "/admin/memorization", labelAr: "المراجعة", icon: BookMarked },
+  { label: "Bulletins", href: "/admin/report-cards", labelAr: "التقارير", icon: FileText },
+  { label: "Diplômes", href: "/admin/certificates", labelAr: "الشهادات", icon: Award },
+  { label: "Évaluations", href: "/admin/assessments", labelAr: "التقييمات", icon: GraduationCap },
+  { label: "Factures", href: "/admin/invoices", labelAr: "الفواتير", icon: Receipt },
+  { label: "Paiements", href: "/admin/payments", labelAr: "المدفوعات", icon: CreditCard },
+  { label: "Ressources", href: "/admin/resources", labelAr: "الموارد", icon: Library },
+  { label: "Actualités", href: "/admin/blog", labelAr: "الأخبار", icon: Newspaper },
 ];
 
 export function MobileNav({ variant }: { variant: "student" | "admin" }) {
@@ -104,8 +104,13 @@ export function MobileNav({ variant }: { variant: "student" | "admin" }) {
                       : "text-foreground/70 hover:bg-accent/50 hover:text-foreground"
                   )}
                 >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  <span className="flex-1 truncate">{item.label}</span>
+                  {item.labelAr && (
+                    <span dir="rtl" lang="ar" className="text-xs text-foreground/40 shrink-0">
+                      {item.labelAr}
+                    </span>
+                  )}
                 </Link>
               );
             })}
