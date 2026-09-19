@@ -31,6 +31,12 @@ export { reportCards, reportCardStatusEnum } from "./report-cards";
 export { invoices, invoiceStatusEnum, computeInvoiceTotal } from "./invoices";
 export { posts, postStatusEnum, slugify } from "./posts";
 export {
+  prospects,
+  appointments,
+  prospectStatusEnum,
+  appointmentStatusEnum,
+} from "./prospects";
+export {
   certificates,
   certificateStatusEnum,
   mentionEnum,
@@ -83,6 +89,7 @@ import { reportCards } from "./report-cards";
 import { invoices } from "./invoices";
 import { assessments, assessmentResults } from "./assessments";
 import { posts } from "./posts";
+import { prospects, appointments } from "./prospects";
 import { certificates } from "./certificates";
 import { sessionNotes, sessionResources } from "./session-notes";
 import { resources } from "./resources";
@@ -122,6 +129,7 @@ import { payments } from "./payments";
 //                  └──N certificates (diplômes)
 //
 //   posts (actualités, sans lien élève)
+//   prospects ──N appointments (acquisition, avant l'inscription)
 
 export const usersRelations = relations(users, ({ one }) => ({
   studentProfile: one(studentProfiles, {
@@ -147,6 +155,7 @@ export const studentProfilesRelations = relations(
     invoices: many(invoices),
     assessmentResults: many(assessmentResults),
     certificates: many(certificates),
+    appointments: many(appointments),
   })
 );
 
@@ -305,6 +314,29 @@ export const memorizationReviewsRelations = relations(
 export const reportCardsRelations = relations(reportCards, ({ one }) => ({
   studentProfile: one(studentProfiles, {
     fields: [reportCards.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+}));
+
+export const prospectsRelations = relations(prospects, ({ one, many }) => ({
+  program: one(programs, {
+    fields: [prospects.programId],
+    references: [programs.id],
+  }),
+  convertedStudentProfile: one(studentProfiles, {
+    fields: [prospects.convertedStudentProfileId],
+    references: [studentProfiles.id],
+  }),
+  appointments: many(appointments),
+}));
+
+export const appointmentsRelations = relations(appointments, ({ one }) => ({
+  prospect: one(prospects, {
+    fields: [appointments.prospectId],
+    references: [prospects.id],
+  }),
+  studentProfile: one(studentProfiles, {
+    fields: [appointments.studentProfileId],
     references: [studentProfiles.id],
   }),
 }));

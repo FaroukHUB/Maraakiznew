@@ -5,12 +5,14 @@ import { usePathname } from "next/navigation";
 import {
   Award,
   BookMarked,
+  CalendarClock,
   ClipboardCheck,
   FileText,
   GraduationCap,
   ListChecks,
   Menu,
   Receipt,
+  UserPlus,
   UsersRound,
   X,
 } from "lucide-react";
@@ -46,6 +48,8 @@ const studentNav = [
 const adminNav = [
   { label: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Élèves", href: "/admin/students", icon: Users },
+  { label: "Prospects", href: "/admin/prospects", icon: UserPlus },
+  { label: "Rendez-vous", href: "/admin/appointments", icon: CalendarClock },
   { label: "Séances", href: "/admin/sessions", icon: CalendarDays },
   { label: "Groupes", href: "/admin/groups", icon: UsersRound },
   { label: "Assiduité", href: "/admin/attendance", icon: ClipboardCheck },

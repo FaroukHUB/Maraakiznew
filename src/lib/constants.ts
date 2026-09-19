@@ -41,3 +41,18 @@ export const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
   placement: "Test de niveau",
   contest: "Concours",
 };
+
+export const PROSPECT_STATUS_LABELS: Record<string, string> = {
+  new: "Nouveau",
+  contacted: "Contacté",
+  trial_scheduled: "Essai prévu",
+  converted: "Inscrite",
+  lost: "Sans suite",
+};
+
+export const APPOINTMENT_STATUS_LABELS: Record<string, string> = {
+  scheduled: "Prévu",
+  done: "Effectué",
+  cancelled: "Annulé",
+  no_show: "Absente",
+};
