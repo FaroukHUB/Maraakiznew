@@ -28,6 +28,8 @@ export {
 export { groups, groupMembers, groupStatusEnum } from "./groups";
 export { skills, skillProgress, skillStatusEnum, ACQUIRED_STATUS } from "./skills";
 export { reportCards, reportCardStatusEnum } from "./report-cards";
+export { invoices, invoiceStatusEnum, computeInvoiceTotal } from "./invoices";
+export type { InvoiceLine } from "./invoices";
 export type { ProgramProgressSnapshot } from "./report-cards";
 export {
   memorizationItems,
@@ -61,6 +63,7 @@ import { groups, groupMembers } from "./groups";
 import { skills, skillProgress } from "./skills";
 import { memorizationItems, memorizationReviews } from "./memorization";
 import { reportCards } from "./report-cards";
+import { invoices } from "./invoices";
 import { sessionNotes, sessionResources } from "./session-notes";
 import { resources } from "./resources";
 import { payments } from "./payments";
@@ -90,7 +93,9 @@ import { payments } from "./payments";
 //                  │
 //                  ├──N memorizationItems ──N memorizationReviews (hifz)
 //                  │
-//                  └──N reportCards (constats datés)
+//                  ├──N reportCards (constats datés)
+//                  │
+//                  └──N invoices ──1 payments (documents comptables)
 
 export const usersRelations = relations(users, ({ one }) => ({
   studentProfile: one(studentProfiles, {
@@ -113,6 +118,7 @@ export const studentProfilesRelations = relations(
     skillProgress: many(skillProgress),
     memorization: many(memorizationItems),
     reportCards: many(reportCards),
+    invoices: many(invoices),
   })
 );
 
@@ -271,6 +277,21 @@ export const reportCardsRelations = relations(reportCards, ({ one }) => ({
   studentProfile: one(studentProfiles, {
     fields: [reportCards.studentProfileId],
     references: [studentProfiles.id],
+  }),
+}));
+
+export const invoicesRelations = relations(invoices, ({ one }) => ({
+  studentProfile: one(studentProfiles, {
+    fields: [invoices.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+  subscription: one(subscriptions, {
+    fields: [invoices.subscriptionId],
+    references: [subscriptions.id],
+  }),
+  payment: one(payments, {
+    fields: [invoices.paymentId],
+    references: [payments.id],
   }),
 }));
 

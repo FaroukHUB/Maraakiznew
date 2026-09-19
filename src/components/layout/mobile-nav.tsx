@@ -8,6 +8,7 @@ import {
   FileText,
   ListChecks,
   Menu,
+  Receipt,
   UsersRound,
   X,
 } from "lucide-react";
@@ -33,6 +34,7 @@ const studentNav = [
   { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
   { label: "Ressources", href: "/student/resources", icon: Library },
   { label: "Paiements", href: "/student/payments", icon: CreditCard },
+  { label: "Mes factures", href: "/student/invoices", icon: Receipt },
   { label: "Blog & Conseils", href: "/student/blog", icon: Newspaper },
   { label: "Mon profil", href: "/student/profile", icon: UserCircle },
 ];
@@ -46,6 +48,7 @@ const adminNav = [
   { label: "Référentiel", href: "/admin/skills", icon: ListChecks },
   { label: "Révisions", href: "/admin/memorization", icon: BookMarked },
   { label: "Bulletins", href: "/admin/report-cards", icon: FileText },
+  { label: "Factures", href: "/admin/invoices", icon: Receipt },
   { label: "Paiements", href: "/admin/payments", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", icon: Library },
   { label: "Blog", href: "/admin/blog", icon: Newspaper },

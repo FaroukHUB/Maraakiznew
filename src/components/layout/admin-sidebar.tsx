@@ -13,6 +13,7 @@ import {
   ListChecks,
   LogOut,
   Newspaper,
+  Receipt,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const adminNav = [
   { label: "Référentiel", href: "/admin/skills", icon: ListChecks },
   { label: "Révisions", href: "/admin/memorization", icon: BookMarked },
   { label: "Bulletins", href: "/admin/report-cards", icon: FileText },
+  { label: "Factures", href: "/admin/invoices", icon: Receipt },
   { label: "Paiements", href: "/admin/payments", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", icon: Library },
   { label: "Blog", href: "/admin/blog", icon: Newspaper },

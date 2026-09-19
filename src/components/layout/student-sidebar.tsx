@@ -10,6 +10,7 @@ import {
   Library,
   LogOut,
   Newspaper,
+  Receipt,
   UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ const studentNav = [
   { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
   { label: "Ressources", href: "/student/resources", icon: Library },
   { label: "Paiements", href: "/student/payments", icon: CreditCard },
+  { label: "Mes factures", href: "/student/invoices", icon: Receipt },
   { label: "Blog & Conseils", href: "/student/blog", icon: Newspaper },
   { label: "Mon profil", href: "/student/profile", icon: UserCircle },
 ];
