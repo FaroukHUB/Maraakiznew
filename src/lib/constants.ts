@@ -34,3 +34,10 @@ export const PACK_STATUS_LABELS: Record<string, string> = {
 
 export const DEFAULT_PACK_SESSIONS = 8;
 export const DEFAULT_WEEKLY_RHYTHM = 2;
+
+export const ASSESSMENT_TYPE_LABELS: Record<string, string> = {
+  quiz: "Quiz",
+  exam: "Évaluation",
+  placement: "Test de niveau",
+  contest: "Concours",
+};

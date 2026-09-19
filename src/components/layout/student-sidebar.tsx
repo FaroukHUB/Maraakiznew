@@ -6,6 +6,7 @@ import {
   BookOpen,
   CreditCard,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   Library,
   LogOut,
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 const studentNav = [
   { label: "Tableau de bord", href: "/student/dashboard", icon: LayoutDashboard },
   { label: "Mes séances", href: "/student/sessions", icon: BookOpen },
+  { label: "Mes évaluations", href: "/student/assessments", icon: GraduationCap },
   { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
   { label: "Ressources", href: "/student/resources", icon: Library },
   { label: "Paiements", href: "/student/payments", icon: CreditCard },

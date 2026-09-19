@@ -29,6 +29,14 @@ export { groups, groupMembers, groupStatusEnum } from "./groups";
 export { skills, skillProgress, skillStatusEnum, ACQUIRED_STATUS } from "./skills";
 export { reportCards, reportCardStatusEnum } from "./report-cards";
 export { invoices, invoiceStatusEnum, computeInvoiceTotal } from "./invoices";
+export {
+  assessments,
+  assessmentResults,
+  assessmentTypeEnum,
+  assessmentStatusEnum,
+  PASSING_THRESHOLD,
+  scorePercentage,
+} from "./assessments";
 export type { InvoiceLine } from "./invoices";
 export type { ProgramProgressSnapshot } from "./report-cards";
 export {
@@ -64,6 +72,7 @@ import { skills, skillProgress } from "./skills";
 import { memorizationItems, memorizationReviews } from "./memorization";
 import { reportCards } from "./report-cards";
 import { invoices } from "./invoices";
+import { assessments, assessmentResults } from "./assessments";
 import { sessionNotes, sessionResources } from "./session-notes";
 import { resources } from "./resources";
 import { payments } from "./payments";
@@ -95,7 +104,9 @@ import { payments } from "./payments";
 //                  │
 //                  ├──N reportCards (constats datés)
 //                  │
-//                  └──N invoices ──1 payments (documents comptables)
+//                  ├──N invoices ──1 payments (documents comptables)
+//                  │
+//                  └──N assessmentResults ──1 assessments (évaluations)
 
 export const usersRelations = relations(users, ({ one }) => ({
   studentProfile: one(studentProfiles, {
@@ -119,6 +130,7 @@ export const studentProfilesRelations = relations(
     memorization: many(memorizationItems),
     reportCards: many(reportCards),
     invoices: many(invoices),
+    assessmentResults: many(assessmentResults),
   })
 );
 
@@ -127,6 +139,7 @@ export const programsRelations = relations(programs, ({ many }) => ({
   resources: many(resources),
   groups: many(groups),
   skills: many(skills),
+  assessments: many(assessments),
 }));
 
 export const subscriptionsRelations = relations(
@@ -276,6 +289,29 @@ export const memorizationReviewsRelations = relations(
 export const reportCardsRelations = relations(reportCards, ({ one }) => ({
   studentProfile: one(studentProfiles, {
     fields: [reportCards.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+}));
+
+export const assessmentsRelations = relations(assessments, ({ one, many }) => ({
+  program: one(programs, {
+    fields: [assessments.programId],
+    references: [programs.id],
+  }),
+  group: one(groups, {
+    fields: [assessments.groupId],
+    references: [groups.id],
+  }),
+  results: many(assessmentResults),
+}));
+
+export const assessmentResultsRelations = relations(assessmentResults, ({ one }) => ({
+  assessment: one(assessments, {
+    fields: [assessmentResults.assessmentId],
+    references: [assessments.id],
+  }),
+  studentProfile: one(studentProfiles, {
+    fields: [assessmentResults.studentProfileId],
     references: [studentProfiles.id],
   }),
 }));
