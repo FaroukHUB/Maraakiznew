@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Award,
   BookMarked,
   ClipboardCheck,
   FileText,
@@ -34,10 +35,11 @@ const studentNav = [
   { label: "Mes séances", href: "/student/sessions", icon: BookOpen },
   { label: "Mes évaluations", href: "/student/assessments", icon: GraduationCap },
   { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
+  { label: "Mes diplômes", href: "/student/certificates", icon: Award },
   { label: "Ressources", href: "/student/resources", icon: Library },
   { label: "Paiements", href: "/student/payments", icon: CreditCard },
   { label: "Mes factures", href: "/student/invoices", icon: Receipt },
-  { label: "Blog & Conseils", href: "/student/blog", icon: Newspaper },
+  { label: "Actualités", href: "/student/blog", icon: Newspaper },
   { label: "Mon profil", href: "/student/profile", icon: UserCircle },
 ];
 
@@ -50,11 +52,12 @@ const adminNav = [
   { label: "Référentiel", href: "/admin/skills", icon: ListChecks },
   { label: "Révisions", href: "/admin/memorization", icon: BookMarked },
   { label: "Bulletins", href: "/admin/report-cards", icon: FileText },
+  { label: "Diplômes", href: "/admin/certificates", icon: Award },
   { label: "Évaluations", href: "/admin/assessments", icon: GraduationCap },
   { label: "Factures", href: "/admin/invoices", icon: Receipt },
   { label: "Paiements", href: "/admin/payments", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", icon: Library },
-  { label: "Blog", href: "/admin/blog", icon: Newspaper },
+  { label: "Actualités", href: "/admin/blog", icon: Newspaper },
 ];
 
 export function MobileNav({ variant }: { variant: "student" | "admin" }) {

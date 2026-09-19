@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Award,
   BookOpen,
   CreditCard,
   FileText,
@@ -21,10 +22,11 @@ const studentNav = [
   { label: "Mes séances", href: "/student/sessions", icon: BookOpen },
   { label: "Mes évaluations", href: "/student/assessments", icon: GraduationCap },
   { label: "Mes bulletins", href: "/student/report-cards", icon: FileText },
+  { label: "Mes diplômes", href: "/student/certificates", icon: Award },
   { label: "Ressources", href: "/student/resources", icon: Library },
   { label: "Paiements", href: "/student/payments", icon: CreditCard },
   { label: "Mes factures", href: "/student/invoices", icon: Receipt },
-  { label: "Blog & Conseils", href: "/student/blog", icon: Newspaper },
+  { label: "Actualités", href: "/student/blog", icon: Newspaper },
   { label: "Mon profil", href: "/student/profile", icon: UserCircle },
 ];
 

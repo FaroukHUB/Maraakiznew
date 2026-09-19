@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Award,
   BookMarked,
   CalendarDays,
   ClipboardCheck,
@@ -29,11 +30,12 @@ const adminNav = [
   { label: "Référentiel", href: "/admin/skills", icon: ListChecks },
   { label: "Révisions", href: "/admin/memorization", icon: BookMarked },
   { label: "Bulletins", href: "/admin/report-cards", icon: FileText },
+  { label: "Diplômes", href: "/admin/certificates", icon: Award },
   { label: "Évaluations", href: "/admin/assessments", icon: GraduationCap },
   { label: "Factures", href: "/admin/invoices", icon: Receipt },
   { label: "Paiements", href: "/admin/payments", icon: CreditCard },
   { label: "Ressources", href: "/admin/resources", icon: Library },
-  { label: "Blog", href: "/admin/blog", icon: Newspaper },
+  { label: "Actualités", href: "/admin/blog", icon: Newspaper },
 ];
 
 export function AdminSidebar() {
