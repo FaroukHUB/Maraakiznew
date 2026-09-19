@@ -31,6 +31,23 @@ revenir.
 | Progression d'un cours | `courses.ts` | `getCoursesForStudent` — `data/courses.ts` |
 | Réglages de l'institut | `settings.ts` | `getSettings` / `whatsappLink` — `data/settings.ts` |
 
+## Navigation
+
+`src/lib/navigation.ts` est la **source unique** : barre latérale
+administration, barre latérale élève et menu mobile en partent tous, via
+`components/layout/nav-tree.tsx`. Les listes ont vécu en triple, et ont
+divergé ; ne pas les recopier.
+
+La règle de rangement est dans le fichier. En résumé : une entrée va dans
+la section de la question qu'on se pose en la cherchant, pas dans celle de
+la table qu'elle affiche ; une section compte entre deux et six entrées.
+La section de la page ouverte est toujours dépliée — l'entrée surlignée ne
+doit jamais être cachée.
+
+Ajouter un écran, c'est ajouter son entrée ici. Le contrôle est
+mécanique : toute page de premier niveau sous `src/app/admin` ou
+`src/app/student` doit avoir un `href` correspondant.
+
 ## Décisions en attente de l'institut
 
 1. **Les absences excusées consomment-elles une séance du forfait ?**
