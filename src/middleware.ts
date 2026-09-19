@@ -9,9 +9,26 @@
  */
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 const { auth } = NextAuth(authConfig);
+
+/**
+ * Redirection interne.
+ *
+ * L'origine est reconstruite depuis les en-têtes de la requête, jamais
+ * depuis `req.url` ni `req.nextUrl` : derrière un proxy — et c'est le cas
+ * sur Vercel comme derrière `next start` — ces deux-là portent l'origine
+ * interne du serveur (localhost:3000) et la redirection sort du site.
+ * Ce commentaire fait foi.
+ */
+function redirectTo(req: NextRequest, pathname: string) {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto =
+    req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
+  const origin = host ? `${proto}://${host}` : req.nextUrl.origin;
+  return NextResponse.redirect(new URL(pathname, origin));
+}
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -23,19 +40,19 @@ export default auth((req) => {
     if (isLoggedIn && pathname.startsWith("/login")) {
       const redirectUrl =
         role === "admin" ? "/admin/dashboard" : "/student/dashboard";
-      return NextResponse.redirect(new URL(redirectUrl, req.url));
+      return redirectTo(req, redirectUrl);
     }
     return NextResponse.next();
   }
 
   // Protected routes — require auth
   if (!isLoggedIn) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return redirectTo(req, "/login");
   }
 
   // Admin routes — require admin role
   if (pathname.startsWith("/admin") && role !== "admin") {
-    return NextResponse.redirect(new URL("/student/dashboard", req.url));
+    return redirectTo(req, "/student/dashboard");
   }
 
   return NextResponse.next();

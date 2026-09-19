@@ -18,6 +18,24 @@ async function seed() {
   console.log("Seeding database...");
 
   // ─── Clean existing data (reverse FK order) ──────────
+  await db.delete(schema.lessonProgress);
+  await db.delete(schema.lessons);
+  await db.delete(schema.courses);
+  await db.delete(schema.orders);
+  await db.delete(schema.shopItems);
+  await db.delete(schema.referrals);
+  await db.delete(schema.referralCodes);
+  await db.delete(schema.documents);
+  await db.delete(schema.payrollEntries);
+  await db.delete(schema.staffMembers);
+  await db.delete(schema.appointments);
+  await db.delete(schema.prospects);
+  await db.delete(schema.certificates);
+  await db.delete(schema.assessmentResults);
+  await db.delete(schema.assessments);
+  await db.delete(schema.invoices);
+  await db.delete(schema.posts);
+  await db.delete(schema.settings);
   await db.delete(schema.reportCards);
   await db.delete(schema.memorizationReviews);
   await db.delete(schema.memorizationItems);
@@ -677,6 +695,694 @@ async function seed() {
   ]);
 
   console.log("  Report cards created (2).");
+
+  // ─── Réglages de l'institut ──────────────────────────
+  await db.insert(schema.settings).values([
+    { key: "institute_name", value: "Institut Maraakiz" },
+    { key: "institute_tagline", value: "Apprendre le Coran, à son rythme" },
+    { key: "contact_email", value: "contact@maraakiz.com" },
+    { key: "whatsapp_number", value: "+33 6 12 34 56 78" },
+    { key: "address", value: "12 rue des Écoles, 75005 Paris" },
+    {
+      key: "invoice_footer",
+      value: "Association Maraakiz — SIRET 000 000 000 00000 — TVA non applicable, art. 293 B du CGI.",
+    },
+  ]);
+
+  console.log("  Settings created (6).");
+
+  // ─── Groupes ─────────────────────────────────────────
+  // Le groupe organise les séances ; chaque élève garde son forfait.
+  const groupData: (typeof schema.groups.$inferInsert)[] = [
+      {
+        programId: nourania.id,
+        name: "Nourania — Débutantes du mardi",
+        level: "debutant" as const,
+        description: "Groupe d'entrée, lettres isolées et attachées.",
+        schedule: "Mardi 18h00 — 19h00",
+        capacity: 8,
+        status: "active" as const,
+      },
+      {
+        programId: quranAccompaniment.id,
+        name: "Coran — Tajwid du samedi",
+        level: "intermediaire" as const,
+        description: "Lecture appliquée et règles de tajwid.",
+        schedule: "Samedi 10h00 — 11h30",
+        capacity: 6,
+        status: "active" as const,
+      },
+      {
+        programId: nourania.id,
+        name: "Nourania — Session d'été (terminée)",
+        level: "debutant" as const,
+        schedule: "Juillet, lundi et jeudi",
+        capacity: 10,
+        status: "archived" as const,
+      },
+  ];
+
+  const insertedGroups = await db
+    .insert(schema.groups)
+    .values(groupData)
+    .returning();
+
+  await db.insert(schema.groupMembers).values([
+    { groupId: insertedGroups[0].id, studentProfileId: profiles[0].id },
+    { groupId: insertedGroups[0].id, studentProfileId: profiles[1].id },
+    { groupId: insertedGroups[0].id, studentProfileId: profiles[3].id },
+    { groupId: insertedGroups[1].id, studentProfileId: profiles[2].id },
+    { groupId: insertedGroups[1].id, studentProfileId: profiles[4].id },
+  ]);
+
+  console.log("  Groups created (3) with 5 memberships.");
+
+  // ─── Progression sur le référentiel ──────────────────
+  // Une ligne absente vaut « non commencée » : on n'écrit que ce qui
+  // a bougé (voir schema/skills.ts).
+  const allSkills = await db.query.skills.findMany();
+  const nouraniaSkillRows = allSkills.filter((s) => s.programId === nourania.id);
+  const quranSkillRows = allSkills.filter(
+    (s) => s.programId === quranAccompaniment.id
+  );
+
+  const progressRows: (typeof schema.skillProgress.$inferInsert)[] = [];
+  nouraniaSkillRows.slice(0, 4).forEach((skill) =>
+    progressRows.push({
+      studentProfileId: profiles[0].id,
+      skillId: skill.id,
+      status: "acquired" as const,
+      validatedAt: relative(-30),
+    })
+  );
+  nouraniaSkillRows.slice(4, 6).forEach((skill) =>
+    progressRows.push({
+      studentProfileId: profiles[0].id,
+      skillId: skill.id,
+      status: "in_progress" as const,
+    })
+  );
+  nouraniaSkillRows.slice(0, 2).forEach((skill) =>
+    progressRows.push({
+      studentProfileId: profiles[1].id,
+      skillId: skill.id,
+      status: "acquired" as const,
+      validatedAt: relative(-15),
+    })
+  );
+  quranSkillRows.slice(0, 3).forEach((skill) =>
+    progressRows.push({
+      studentProfileId: profiles[2].id,
+      skillId: skill.id,
+      status: "acquired" as const,
+      validatedAt: relative(-45),
+    })
+  );
+  if (progressRows.length > 0) {
+    await db.insert(schema.skillProgress).values(progressRows);
+  }
+
+  console.log(`  Skill progress created (${progressRows.length}).`);
+
+  // ─── Évaluations ─────────────────────────────────────
+  const insertedAssessments = await db
+    .insert(schema.assessments)
+    .values([
+      {
+        title: "Contrôle — lettres isolées",
+        type: "quiz" as const,
+        status: "published" as const,
+        programId: nourania.id,
+        groupId: insertedGroups[0].id,
+        description: "Reconnaissance et prononciation des 28 lettres.",
+        maxScore: 20,
+        heldOn: relative(-21),
+      },
+      {
+        title: "Examen de fin de module — Nourania 1",
+        type: "exam" as const,
+        status: "published" as const,
+        programId: nourania.id,
+        maxScore: 40,
+        heldOn: relative(-7),
+      },
+      {
+        title: "Test de niveau — entrée de septembre",
+        type: "placement" as const,
+        status: "draft" as const,
+        programId: quranAccompaniment.id,
+        maxScore: 20,
+        heldOn: relative(3),
+      },
+    ])
+    .returning();
+
+  await db.insert(schema.assessmentResults).values([
+    {
+      assessmentId: insertedAssessments[0].id,
+      studentProfileId: profiles[0].id,
+      score: 18,
+      comment: "Très bonne prononciation, deux confusions sur les emphatiques.",
+      gradedAt: relative(-20),
+    },
+    {
+      assessmentId: insertedAssessments[0].id,
+      studentProfileId: profiles[1].id,
+      score: 13,
+      comment: "À revoir : les lettres de la gorge.",
+      gradedAt: relative(-20),
+    },
+    {
+      assessmentId: insertedAssessments[0].id,
+      studentProfileId: profiles[3].id,
+      score: 16,
+      gradedAt: relative(-20),
+    },
+    {
+      assessmentId: insertedAssessments[1].id,
+      studentProfileId: profiles[0].id,
+      score: 35,
+      comment: "Module acquis.",
+      gradedAt: relative(-5),
+    },
+    {
+      assessmentId: insertedAssessments[1].id,
+      studentProfileId: profiles[1].id,
+      score: 26,
+      gradedAt: relative(-5),
+    },
+  ]);
+
+  console.log("  Assessments created (3) with 5 results.");
+
+  // ─── Diplômes ────────────────────────────────────────
+  await db.insert(schema.certificates).values([
+    {
+      studentProfileId: profiles[0].id,
+      programId: nourania.id,
+      reference: "DIP-2026-0001",
+      title: "Attestation — Nourania, niveau 1",
+      status: "issued" as const,
+      mention: "tres_bien" as const,
+      overallScore: 87,
+      basis: {
+        skillsAcquired: 4,
+        skillsTotal: 12,
+        progressRate: 33.3,
+        assessmentAverage: 87.5,
+        attendanceRate: 100,
+        memorizedAyahs: 10,
+        sessionsCompleted: 6,
+      },
+      comment: "Parcours régulier, prononciation soignée.",
+      issuedOn: new Date(relative(-4)),
+    },
+    {
+      studentProfileId: profiles[1].id,
+      programId: nourania.id,
+      title: "Attestation — Nourania, niveau 1",
+      status: "draft" as const,
+      mention: "bien" as const,
+      overallScore: 68,
+      basis: {
+        skillsAcquired: 2,
+        skillsTotal: 12,
+        progressRate: 16.7,
+        assessmentAverage: 65,
+        attendanceRate: 80,
+        memorizedAyahs: 20,
+        sessionsCompleted: 5,
+      },
+      comment: "En attente de l'examen de rattrapage.",
+    },
+  ]);
+
+  console.log("  Certificates created (2).");
+
+  // ─── Factures ────────────────────────────────────────
+  // Le numéro n'est attribué qu'à l'émission : le brouillon n'en a pas,
+  // donc le supprimer ne laisse pas de trou dans la série.
+  const lines1 = [
+    { label: "Forfait Nourania — 8 séances", quantity: 1, unitPriceCents: 16000 },
+  ];
+  const lines2 = [
+    { label: "Forfait Coran — 8 séances", quantity: 1, unitPriceCents: 20000 },
+    { label: "Manuel Nourania", quantity: 1, unitPriceCents: 1500 },
+  ];
+  const lines3 = [
+    { label: "Forfait Nourania — 4 séances", quantity: 1, unitPriceCents: 8000 },
+  ];
+
+  await db.insert(schema.invoices).values([
+    {
+      studentProfileId: profiles[0].id,
+      subscriptionId: subs[0].id,
+      number: "2026-0001",
+      status: "paid" as const,
+      issueDate: new Date(relative(-60)),
+      dueDate: new Date(relative(-45)),
+      lines: lines1,
+      totalCents: schema.computeInvoiceTotal(lines1),
+      paidAt: relative(-52),
+    },
+    {
+      studentProfileId: profiles[2].id,
+      number: "2026-0002",
+      status: "issued" as const,
+      issueDate: new Date(relative(-10)),
+      dueDate: new Date(relative(5)),
+      lines: lines2,
+      totalCents: schema.computeInvoiceTotal(lines2),
+    },
+    {
+      studentProfileId: profiles[1].id,
+      status: "draft" as const,
+      lines: lines3,
+      totalCents: schema.computeInvoiceTotal(lines3),
+      notes: "À confirmer avec la famille avant émission.",
+    },
+  ]);
+
+  console.log("  Invoices created (3).");
+
+  // ─── Actualités ──────────────────────────────────────
+  await db.insert(schema.posts).values([
+    {
+      authorId: admin.id,
+      title: "Reprise des cours le 8 septembre",
+      slug: "reprise-des-cours-le-8-septembre",
+      category: "Vie de l'institut",
+      excerpt: "Les créneaux de la rentrée sont en ligne.",
+      content:
+        "Les cours reprennent le lundi 8 septembre. Les créneaux de chaque groupe sont visibles depuis votre espace, onglet Séances.\n\nLes inscriptions restent ouvertes jusqu'au 30 septembre, dans la limite des places disponibles.",
+      status: "published" as const,
+      pinned: true,
+      publishedAt: relative(-30),
+    },
+    {
+      authorId: admin.id,
+      title: "Concours de mémorisation — inscriptions ouvertes",
+      slug: "concours-de-memorisation-inscriptions-ouvertes",
+      category: "Événements",
+      excerpt: "Trois catégories, du juz 'Amma au juz Tabarak.",
+      content:
+        "Le concours annuel de mémorisation se tiendra le dernier samedi du mois.\n\nTrois catégories sont proposées selon la portion mémorisée. L'inscription se fait auprès de votre enseignante.",
+      status: "published" as const,
+      publishedAt: relative(-9),
+    },
+    {
+      authorId: admin.id,
+      title: "Fermeture exceptionnelle",
+      slug: "fermeture-exceptionnelle",
+      category: "Vie de l'institut",
+      content: "Brouillon — préciser les dates avant publication.",
+      status: "draft" as const,
+    },
+  ]);
+
+  console.log("  Posts created (3).");
+
+  // ─── Prospects et rendez-vous ────────────────────────
+  const prospectData: (typeof schema.prospects.$inferInsert)[] = [
+      {
+        name: "Leila Amrani",
+        email: "leila.amrani@email.com",
+        phone: "+33 6 22 33 44 55",
+        source: "Instagram",
+        status: "trial_scheduled" as const,
+        programId: nourania.id,
+        declaredLevel: "debutant" as const,
+        notes: "Disponible en soirée.",
+      },
+      {
+        name: "Salma Ouali",
+        email: "salma.ouali@email.com",
+        source: "Bouche-à-oreille",
+        status: "contacted" as const,
+        programId: quranAccompaniment.id,
+        declaredLevel: "intermediaire" as const,
+      },
+      {
+        name: "Rania Belkacem",
+        phone: "+33 7 88 99 00 11",
+        source: "Site internet",
+        status: "new" as const,
+      },
+      {
+        name: "Imane Tazi",
+        email: "imane.tazi@email.com",
+        source: "Site internet",
+        status: "lost" as const,
+        lostReason: "Horaires incompatibles.",
+      },
+  ];
+
+  const insertedProspects = await db
+    .insert(schema.prospects)
+    .values(prospectData)
+    .returning();
+
+  await db.insert(schema.appointments).values([
+    {
+      prospectId: insertedProspects[0].id,
+      title: "Cours d'essai — Nourania",
+      scheduledAt: relative(2),
+      durationMinutes: 45,
+      status: "scheduled" as const,
+      meetingLink: "#",
+    },
+    {
+      prospectId: insertedProspects[1].id,
+      title: "Appel de présentation",
+      scheduledAt: relative(-3),
+      durationMinutes: 20,
+      status: "done" as const,
+      notes: "Souhaite commencer en octobre.",
+    },
+    {
+      studentProfileId: profiles[1].id,
+      title: "Point pédagogique avec la famille",
+      scheduledAt: relative(5),
+      durationMinutes: 30,
+      status: "scheduled" as const,
+    },
+  ]);
+
+  console.log("  Prospects created (4) with 3 appointments.");
+
+  // ─── Équipe et paie ──────────────────────────────────
+  // Rémunération horaire OU mensuelle, jamais les deux.
+  const [lead] = await db
+    .insert(schema.staffMembers)
+    .values([
+      {
+        name: "Oum Soumaya",
+        email: "responsable@maraakiz.com",
+        role: "pedagogical_lead" as const,
+        status: "active" as const,
+        monthlyRateCents: 180000,
+        hiredOn: new Date(relative(-700)),
+      },
+    ])
+    .returning();
+
+  const insertedStaff = await db
+    .insert(schema.staffMembers)
+    .values([
+      {
+        name: "Oum Khadija",
+        email: "khadija@maraakiz.com",
+        phone: "+33 6 11 22 33 44",
+        role: "teacher" as const,
+        status: "active" as const,
+        hourlyRateCents: 2500,
+        hiredOn: new Date(relative(-400)),
+        supervisorId: lead.id,
+      },
+      {
+        name: "Oum Maryam",
+        email: "maryam@maraakiz.com",
+        role: "teacher" as const,
+        status: "active" as const,
+        hourlyRateCents: 2200,
+        hiredOn: new Date(relative(-200)),
+        supervisorId: lead.id,
+      },
+      {
+        name: "Nadia Sekkat",
+        email: "secretariat@maraakiz.com",
+        role: "secretary" as const,
+        status: "active" as const,
+        monthlyRateCents: 90000,
+        hiredOn: new Date(relative(-150)),
+        supervisorId: lead.id,
+      },
+    ])
+    .returning();
+
+  const period = new Date().toISOString().slice(0, 7);
+  const previousPeriod = new Date(Date.now() - 31 * day).toISOString().slice(0, 7);
+
+  await db.insert(schema.payrollEntries).values([
+    {
+      staffMemberId: insertedStaff[0].id,
+      period: previousPeriod,
+      status: "paid" as const,
+      sessionsCount: 24,
+      minutesWorked: 1440,
+      amountCents: 60000,
+      paidOn: new Date(relative(-5)),
+    },
+    {
+      staffMemberId: insertedStaff[1].id,
+      period: previousPeriod,
+      status: "paid" as const,
+      sessionsCount: 12,
+      minutesWorked: 720,
+      amountCents: 26400,
+      paidOn: new Date(relative(-5)),
+    },
+    {
+      staffMemberId: lead.id,
+      period,
+      status: "draft" as const,
+      amountCents: 180000,
+    },
+  ]);
+
+  console.log("  Staff created (4) with 3 payroll entries.");
+
+  // ─── Documents administratifs ────────────────────────
+  await db.insert(schema.documents).values([
+    {
+      studentProfileId: profiles[0].id,
+      title: "Contrat d'inscription 2026",
+      type: "contract" as const,
+      fileUrl: "#",
+      signedOn: new Date(relative(-120)),
+    },
+    {
+      studentProfileId: profiles[0].id,
+      title: "Autorisation de droit à l'image",
+      type: "authorization" as const,
+      fileUrl: "#",
+      signedOn: new Date(relative(-120)),
+      expiresOn: new Date(relative(20)),
+    },
+    {
+      studentProfileId: profiles[1].id,
+      title: "Contrat d'inscription 2026",
+      type: "contract" as const,
+      fileUrl: "#",
+      signedOn: new Date(relative(-90)),
+    },
+    {
+      title: "Règlement intérieur",
+      type: "other" as const,
+      fileUrl: "#",
+      notes: "Document commun, remis à chaque inscription.",
+    },
+  ]);
+
+  console.log("  Documents created (4).");
+
+  // ─── Boutique ────────────────────────────────────────
+  const insertedItems = await db
+    .insert(schema.shopItems)
+    .values([
+      {
+        name: "Manuel Al-Qaida An-Noraniya",
+        description: "Édition cartonnée, format A4.",
+        priceCents: 1500,
+        stock: 12,
+        status: "available" as const,
+      },
+      {
+        name: "Mushaf Tajwid — format moyen",
+        description: "Règles de tajwid en couleurs.",
+        priceCents: 2500,
+        stock: 5,
+        status: "available" as const,
+      },
+      {
+        name: "Cahier d'exercices Nourania",
+        priceCents: 800,
+        stock: 0,
+        status: "out_of_stock" as const,
+      },
+      {
+        name: "Trousse Maraakiz",
+        priceCents: 600,
+        stock: null, // stock non suivi
+        status: "available" as const,
+      },
+    ])
+    .returning();
+
+  const orderLines = [
+    {
+      itemId: insertedItems[0].id,
+      label: insertedItems[0].name,
+      quantity: 1,
+      unitPriceCents: 1500,
+    },
+  ];
+
+  await db.insert(schema.orders).values([
+    {
+      studentProfileId: profiles[0].id,
+      status: "delivered" as const,
+      lines: orderLines,
+      totalCents: 1500,
+      paidAt: relative(-14),
+      deliveredAt: relative(-12),
+    },
+    {
+      studentProfileId: profiles[2].id,
+      status: "pending" as const,
+      lines: [
+        {
+          itemId: insertedItems[1].id,
+          label: insertedItems[1].name,
+          quantity: 1,
+          unitPriceCents: 2500,
+        },
+      ],
+      totalCents: 2500,
+    },
+  ]);
+
+  console.log("  Shop items created (4) with 2 orders.");
+
+  // ─── Parrainage ──────────────────────────────────────
+  // La récompense n'est acquise qu'à l'inscription de la filleule.
+  await db.insert(schema.referralCodes).values(
+    profiles.slice(0, 3).map((profile) => ({
+      studentProfileId: profile.id,
+      code: schema.generateReferralCode(profile.id),
+    }))
+  );
+
+  await db.insert(schema.referrals).values([
+    {
+      referrerProfileId: profiles[0].id,
+      prospectId: insertedProspects[0].id,
+      status: "pending" as const,
+      rewardCents: 2000,
+    },
+    {
+      referrerProfileId: profiles[1].id,
+      referredProfileId: profiles[4].id,
+      status: "earned" as const,
+      rewardCents: 2000,
+      earnedAt: relative(-40),
+    },
+    {
+      referrerProfileId: profiles[0].id,
+      referredProfileId: profiles[3].id,
+      status: "rewarded" as const,
+      rewardCents: 2000,
+      earnedAt: relative(-100),
+      rewardedAt: relative(-95),
+    },
+  ]);
+
+  console.log("  Referral codes created (3) with 3 referrals.");
+
+  // ─── Cours interactifs ───────────────────────────────
+  // Un cours sans leçon ne peut pas être publié.
+  const insertedCourses = await db
+    .insert(schema.courses)
+    .values([
+      {
+        programId: nourania.id,
+        title: "Les lettres de l'alphabet, pas à pas",
+        description:
+          "Une leçon par groupe de lettres, avec la prononciation et un exercice.",
+        status: "published" as const,
+        sortOrder: 1,
+      },
+      {
+        programId: quranAccompaniment.id,
+        title: "Les règles de base du tajwid",
+        description: "Idghâm, ikhfâ, qalqala : la théorie et l'écoute.",
+        status: "published" as const,
+        sortOrder: 2,
+      },
+      {
+        programId: nourania.id,
+        title: "Les prolongations (brouillon)",
+        status: "draft" as const,
+        sortOrder: 3,
+      },
+    ])
+    .returning();
+
+  const insertedLessons = await db
+    .insert(schema.lessons)
+    .values([
+      {
+        courseId: insertedCourses[0].id,
+        title: "Les lettres de la gorge",
+        type: "video" as const,
+        contentUrl: "#",
+        durationMinutes: 8,
+        sortOrder: 1,
+      },
+      {
+        courseId: insertedCourses[0].id,
+        title: "Les lettres emphatiques",
+        type: "video" as const,
+        contentUrl: "#",
+        durationMinutes: 11,
+        sortOrder: 2,
+      },
+      {
+        courseId: insertedCourses[0].id,
+        title: "Exercice — reconnaître la lettre entendue",
+        type: "exercise" as const,
+        content:
+          "Écoutez chaque enregistrement et notez la lettre prononcée, puis vérifiez avec votre enseignante.",
+        sortOrder: 3,
+      },
+      {
+        courseId: insertedCourses[1].id,
+        title: "La qalqala",
+        type: "audio" as const,
+        contentUrl: "#",
+        durationMinutes: 6,
+        sortOrder: 1,
+      },
+      {
+        courseId: insertedCourses[1].id,
+        title: "Fiche — les cinq lettres de la qalqala",
+        type: "text" as const,
+        content:
+          "Qâf, tâ, bâ, jîm, dâl. Elles rebondissent lorsqu'elles portent un soukoun.",
+        sortOrder: 2,
+      },
+    ])
+    .returning();
+
+  await db.insert(schema.lessonProgress).values([
+    {
+      lessonId: insertedLessons[0].id,
+      studentProfileId: profiles[0].id,
+      completedAt: relative(-6),
+    },
+    {
+      lessonId: insertedLessons[1].id,
+      studentProfileId: profiles[0].id,
+      completedAt: relative(-2),
+    },
+    {
+      lessonId: insertedLessons[3].id,
+      studentProfileId: profiles[2].id,
+      completedAt: relative(-1),
+    },
+  ]);
+
+  console.log("  Courses created (3) with 5 lessons.");
 
   // ─── Done ────────────────────────────────────────────
   console.log("\nSeed complete.");

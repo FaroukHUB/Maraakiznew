@@ -9,7 +9,7 @@ import { Calculator } from "lucide-react";
 import { generatePayroll, setPayrollStatus } from "@/actions/staff";
 import { STAFF_ROLE_LABELS } from "@/lib/constants";
 
-function PayrollPanelBase({
+export function PayrollPanel({
   period,
   staff,
 }: {
@@ -106,7 +106,7 @@ function PayrollPanelBase({
   );
 }
 
-function StatusButton({ id, status }: { id: string; status: "draft" | "paid" }) {
+export function PayrollStatusButton({ id, status }: { id: string; status: "draft" | "paid" }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -127,5 +127,3 @@ function StatusButton({ id, status }: { id: string; status: "draft" | "paid" }) 
     </Button>
   );
 }
-
-export const PayrollPanel = Object.assign(PayrollPanelBase, { StatusButton });

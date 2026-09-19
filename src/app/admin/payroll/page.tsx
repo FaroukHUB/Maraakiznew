@@ -3,7 +3,7 @@ import { getActiveStaffForSelect, getPayrollForPeriod, PAYROLL_STATUS_LABELS } f
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Wallet } from "lucide-react";
-import { PayrollPanel } from "./payroll-panel";
+import { PayrollPanel, PayrollStatusButton } from "./payroll-panel";
 
 function formatMoney(cents: number): string {
   return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(
@@ -89,7 +89,7 @@ export default async function AdminPayrollPage({
                     >
                       {PAYROLL_STATUS_LABELS[entry.status]}
                     </Badge>
-                    <PayrollPanel.StatusButton id={entry.id} status={entry.status} />
+                    <PayrollStatusButton id={entry.id} status={entry.status} />
                   </div>
                 </div>
               ))}
