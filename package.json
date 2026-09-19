@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "tsx src/db/migrate.ts && next build",
+    "db:migrate:run": "tsx src/db/migrate.ts",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
