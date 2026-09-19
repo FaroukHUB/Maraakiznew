@@ -4,9 +4,11 @@ import { getWeekSessionCount, getUpcomingSessions } from "@/data/sessions";
 import { getPendingPaymentCount } from "@/data/payments";
 import { getAttendanceStats, getSessionsNeedingAttendance } from "@/data/attendance";
 import { getAverageProgressByProgram } from "@/data/skills";
+import { getDueReviews } from "@/data/memorization";
+import { formatPortion } from "@/lib/quran";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, CalendarDays, CreditCard, AlertTriangle, ClipboardCheck, ListChecks } from "lucide-react";
+import { Users, CalendarDays, CreditCard, AlertTriangle, ClipboardCheck, ListChecks, BookMarked } from "lucide-react";
 import Link from "next/link";
 
 function formatDate(date: Date): string {
@@ -33,6 +35,7 @@ export default async function AdminDashboard() {
     attendance,
     sessionsToProcess,
     progressByProgram,
+    dueReviews,
   ] = await Promise.all([
     getStudentCount(),
     getWeekSessionCount(),
@@ -42,6 +45,7 @@ export default async function AdminDashboard() {
     getAttendanceStats({ month: currentMonth }),
     getSessionsNeedingAttendance(),
     getAverageProgressByProgram(),
+    getDueReviews(50),
   ]);
 
   const studentsNeedingRenewal = students.filter(
@@ -84,6 +88,20 @@ export default async function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        <Link href="/admin/memorization">
+          <Card className="h-full hover:border-primary/40 transition-colors">
+            <CardContent className="flex items-center gap-4 pt-6">
+              <div className="h-12 w-12 rounded-xl bg-quran/10 flex items-center justify-center">
+                <BookMarked className="h-6 w-6 text-quran" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Révisions dues</p>
+                <p className="text-2xl font-bold">{dueReviews.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Link href="/admin/attendance">
           <Card className="h-full hover:border-primary/40 transition-colors">
@@ -184,6 +202,64 @@ export default async function AdminDashboard() {
                     </p>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Révisions urgentes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <BookMarked className="h-4 w-4" />
+                Révisions urgentes
+              </span>
+              <Link
+                href="/admin/memorization"
+                className="text-sm text-primary hover:underline font-normal"
+              >
+                Tout voir
+              </Link>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {dueReviews.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                Aucune révision en attente
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {dueReviews.slice(0, 5).map((item) => (
+                  <Link
+                    key={item.id}
+                    href="/admin/memorization"
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border hover:bg-accent/30 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{item.studentName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {formatPortion(item.surahNumber, item.ayahStart, item.ayahEnd)}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs shrink-0 ${
+                        item.daysOverdue > 7
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {item.daysOverdue <= 0
+                        ? "aujourd'hui"
+                        : `${item.daysOverdue} j de retard`}
+                    </span>
+                  </Link>
+                ))}
+                {dueReviews.length > 5 && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    et {dueReviews.length - 5} autre{dueReviews.length - 5 > 1 ? "s" : ""}
+                  </p>
+                )}
               </div>
             )}
           </CardContent>

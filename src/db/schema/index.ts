@@ -20,12 +20,21 @@ export {
   sessionStatusEnum,
   attendanceStatusEnum,
   CONSUMING_STATUSES,
+  CONSUMING_ATTENDANCE_STATUSES,
   ATTENDED_STATUSES,
   MISSED_STATUSES,
   RATED_STATUSES,
 } from "./sessions";
 export { groups, groupMembers, groupStatusEnum } from "./groups";
 export { skills, skillProgress, skillStatusEnum, ACQUIRED_STATUS } from "./skills";
+export {
+  memorizationItems,
+  memorizationReviews,
+  reviewQualityEnum,
+  REVIEW_INTERVALS_DAYS,
+  nextIntervalIndex,
+  computeNextReview,
+} from "./memorization";
 export {
   sessionNotes,
   sessionResources,
@@ -48,6 +57,7 @@ import { subscriptions } from "./subscriptions";
 import { sessions, sessionParticipants } from "./sessions";
 import { groups, groupMembers } from "./groups";
 import { skills, skillProgress } from "./skills";
+import { memorizationItems, memorizationReviews } from "./memorization";
 import { sessionNotes, sessionResources } from "./session-notes";
 import { resources } from "./resources";
 import { payments } from "./payments";
@@ -73,7 +83,9 @@ import { payments } from "./payments";
 //                  │                         │
 //                  │                         └──N sessions (séances de groupe)
 //                  │
-//                  └──N skillProgress ──1 skills ──1 programs (référentiel)
+//                  ├──N skillProgress ──1 skills ──1 programs (référentiel)
+//                  │
+//                  └──N memorizationItems ──N memorizationReviews (hifz)
 
 export const usersRelations = relations(users, ({ one }) => ({
   studentProfile: one(studentProfiles, {
@@ -94,6 +106,7 @@ export const studentProfilesRelations = relations(
     sessionParticipations: many(sessionParticipants),
     groupMemberships: many(groupMembers),
     skillProgress: many(skillProgress),
+    memorization: many(memorizationItems),
   })
 );
 
@@ -117,6 +130,7 @@ export const subscriptionsRelations = relations(
     }),
     sessions: many(sessions),
     payments: many(payments),
+    participations: many(sessionParticipants),
   })
 );
 
@@ -147,6 +161,10 @@ export const sessionParticipantsRelations = relations(
     studentProfile: one(studentProfiles, {
       fields: [sessionParticipants.studentProfileId],
       references: [studentProfiles.id],
+    }),
+    subscription: one(subscriptions, {
+      fields: [sessionParticipants.subscriptionId],
+      references: [subscriptions.id],
     }),
   })
 );
@@ -217,6 +235,31 @@ export const skillProgressRelations = relations(skillProgress, ({ one }) => ({
     references: [sessions.id],
   }),
 }));
+
+export const memorizationItemsRelations = relations(
+  memorizationItems,
+  ({ one, many }) => ({
+    studentProfile: one(studentProfiles, {
+      fields: [memorizationItems.studentProfileId],
+      references: [studentProfiles.id],
+    }),
+    reviews: many(memorizationReviews),
+  })
+);
+
+export const memorizationReviewsRelations = relations(
+  memorizationReviews,
+  ({ one }) => ({
+    item: one(memorizationItems, {
+      fields: [memorizationReviews.itemId],
+      references: [memorizationItems.id],
+    }),
+    session: one(sessions, {
+      fields: [memorizationReviews.sessionId],
+      references: [sessions.id],
+    }),
+  })
+);
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   subscription: one(subscriptions, {

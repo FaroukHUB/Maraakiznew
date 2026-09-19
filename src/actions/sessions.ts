@@ -11,13 +11,67 @@ import {
   subscriptions,
   CONSUMING_STATUSES,
 } from "@/db/schema";
-import { getConsumedSessionCount } from "@/data/sessions";
+import {
+  getConsumedSessionCount,
+  getSubscriptionIdsAffectedBySession,
+} from "@/data/sessions";
 
 // ─── Types ───────────────────────────────────────────────
 
 type SessionStatus = "planned" | "completed" | "cancelled" | "student_absent" | "teacher_absent";
 
 type ActionResult = { success: true } | { success: false; error: string };
+
+
+// ─── Résolution du forfait d'une participante ────────────
+//
+// Une participante est débitée sur SON forfait du même programme que la
+// séance. On privilégie le forfait actif ; à défaut, le plus récent.
+// Sans forfait correspondant, on ne débite rien plutôt que de deviner.
+
+async function resolveParticipantSubscription(
+  studentProfileId: string,
+  programId: string
+): Promise<string | null> {
+  const candidates = await db.query.subscriptions.findMany({
+    where: and(
+      eq(subscriptions.studentProfileId, studentProfileId),
+      eq(subscriptions.programId, programId)
+    ),
+    orderBy: (s, { desc }) => [desc(s.createdAt)],
+  });
+
+  return (
+    candidates.find((s) => s.status === "active")?.id ?? candidates[0]?.id ?? null
+  );
+}
+
+/**
+ * Referme tous les forfaits arrivés à leur terme après un changement de
+ * statut de séance — celui du porteur comme ceux des participantes.
+ */
+async function closeCompletedSubscriptions(sessionId: string) {
+  const affected = await getSubscriptionIdsAffectedBySession(sessionId);
+
+  for (const subscriptionId of affected) {
+    const sub = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.id, subscriptionId),
+    });
+    if (!sub || sub.status !== "active") continue;
+
+    const consumed = await getConsumedSessionCount(sub.id);
+    if (consumed >= sub.totalSessions) {
+      await db
+        .update(subscriptions)
+        .set({
+          status: "completed",
+          closedAt: new Date(),
+          closureReason: "all_sessions_consumed",
+        })
+        .where(eq(subscriptions.id, sub.id));
+    }
+  }
+}
 
 // ─── Create ──────────────────────────────────────────────
 
@@ -114,21 +168,9 @@ export async function updateSessionStatus(
       .set({ status: newStatus, updatedAt: new Date() })
       .where(eq(sessions.id, sessionId));
 
-    // Check if subscription should auto-close
-    const sub = session.subscription;
-    if (sub.status === "active") {
-      const consumed = await getConsumedSessionCount(sub.id);
-      if (consumed >= sub.totalSessions) {
-        await db
-          .update(subscriptions)
-          .set({
-            status: "completed",
-            closedAt: new Date(),
-            closureReason: "all_sessions_consumed",
-          })
-          .where(eq(subscriptions.id, sub.id));
-      }
-    }
+    // Referme les forfaits arrivés à leur terme : le porteur ET les
+    // participantes, qu'une séance de groupe débite aussi.
+    await closeCompletedSubscriptions(sessionId);
 
     revalidatePath("/admin/sessions");
     revalidatePath(`/admin/sessions/${sessionId}`);
@@ -201,19 +243,34 @@ export async function setSessionParticipants(
       .delete(sessionParticipants)
       .where(eq(sessionParticipants.sessionId, sessionId));
 
-    // Insert new participants
+    // Insert new participants, chacune rattachée à son propre forfait
     if (participants.length > 0) {
-      await db.insert(sessionParticipants).values(
-        participants.map((p) => ({
+      const session = await db.query.sessions.findFirst({
+        where: eq(sessions.id, sessionId),
+        with: { subscription: true },
+      });
+      if (!session) return { success: false, error: "Séance introuvable." };
+
+      const rows = await Promise.all(
+        participants.map(async (p) => ({
           sessionId,
           studentProfileId: p.studentProfileId,
           attendanceStatus: p.attendanceStatus,
           hasReplayAccess: p.hasReplayAccess,
+          subscriptionId: await resolveParticipantSubscription(
+            p.studentProfileId,
+            session.subscription.programId
+          ),
         }))
       );
+
+      await db.insert(sessionParticipants).values(rows);
     }
 
+    await closeCompletedSubscriptions(sessionId);
+
     revalidatePath(`/admin/sessions/${sessionId}`);
+    revalidatePath("/admin/students");
     return { success: true };
   } catch (err) {
     return { success: false, error: "Erreur lors de la mise à jour des participantes." };

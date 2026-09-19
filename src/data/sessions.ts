@@ -7,6 +7,7 @@ import {
   sessionNotes,
   subscriptions,
   CONSUMING_STATUSES,
+  CONSUMING_ATTENDANCE_STATUSES,
 } from "@/db/schema";
 
 export async function getSessionsByPackId(
@@ -43,19 +44,110 @@ export async function getUpcomingSessions(limit: number = 5) {
   });
 }
 
+/**
+ * Séances consommées par un forfait.
+ *
+ * Deux sources, additionnées :
+ *
+ *   1. Les séances PORTÉES par ce forfait (sessions.subscriptionId), selon
+ *      CONSUMING_STATUSES. C'est la règle historique, inchangée.
+ *
+ *   2. Les PARTICIPATIONS à une séance portée par un AUTRE forfait — le cas
+ *      des cours collectifs — selon CONSUMING_ATTENDANCE_STATUSES.
+ *
+ * La condition `sessions.subscriptionId <> subscriptionId` du second terme
+ * empêche le double comptage du forfait porteur.
+ *
+ * Les participations dont subscriptionId est NULL ne comptent pas : ce sont
+ * celles enregistrées avant cette règle, le comportement passé est préservé.
+ *
+ * Unique implémentation du calcul : tout le reste de l'app passe par ici.
+ */
 export async function getConsumedSessionCount(
   subscriptionId: string
 ): Promise<number> {
-  const result = await db
-    .select({ count: sql<number>`count(*)` })
+  const [counts] = await getConsumedSessionCounts([subscriptionId]);
+  return counts?.consumed ?? 0;
+}
+
+/**
+ * Version groupée, pour les listes (fiche élève, liste des élèves).
+ *
+ * Évite le N+1 : une requête pour les séances portées, une pour les
+ * participations, quel que soit le nombre de forfaits.
+ */
+export async function getConsumedSessionCounts(
+  subscriptionIds: string[]
+): Promise<{ subscriptionId: string; consumed: number }[]> {
+  if (subscriptionIds.length === 0) return [];
+
+  const owned = await db
+    .select({
+      subscriptionId: sessions.subscriptionId,
+      count: sql<number>`count(*)`,
+    })
     .from(sessions)
     .where(
       and(
-        eq(sessions.subscriptionId, subscriptionId),
+        inArray(sessions.subscriptionId, subscriptionIds),
         inArray(sessions.status, [...CONSUMING_STATUSES])
       )
-    );
-  return Number(result[0].count);
+    )
+    .groupBy(sessions.subscriptionId);
+
+  const attended = await db
+    .select({
+      subscriptionId: sessionParticipants.subscriptionId,
+      count: sql<number>`count(*)`,
+    })
+    .from(sessionParticipants)
+    .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
+    .where(
+      and(
+        inArray(sessionParticipants.subscriptionId, subscriptionIds),
+        sql`${sessions.subscriptionId} <> ${sessionParticipants.subscriptionId}`,
+        inArray(sessions.status, [...CONSUMING_STATUSES]),
+        inArray(sessionParticipants.attendanceStatus, [
+          ...CONSUMING_ATTENDANCE_STATUSES,
+        ])
+      )
+    )
+    .groupBy(sessionParticipants.subscriptionId);
+
+  const totals = new Map(subscriptionIds.map((id) => [id, 0]));
+  for (const row of owned) {
+    if (row.subscriptionId) {
+      totals.set(row.subscriptionId, (totals.get(row.subscriptionId) ?? 0) + Number(row.count));
+    }
+  }
+  for (const row of attended) {
+    if (row.subscriptionId) {
+      totals.set(row.subscriptionId, (totals.get(row.subscriptionId) ?? 0) + Number(row.count));
+    }
+  }
+
+  return [...totals].map(([subscriptionId, consumed]) => ({ subscriptionId, consumed }));
+}
+
+/**
+ * Forfaits impactés par une séance : le forfait porteur, plus ceux des
+ * participantes. Sert à refermer tous les forfaits arrivés à leur terme
+ * après un changement de statut, pas seulement celui du porteur.
+ */
+export async function getSubscriptionIdsAffectedBySession(
+  sessionId: string
+): Promise<string[]> {
+  const session = await db.query.sessions.findFirst({
+    where: eq(sessions.id, sessionId),
+    with: { participants: true },
+  });
+  if (!session) return [];
+
+  const ids = new Set<string>([session.subscriptionId]);
+  for (const participant of session.participants) {
+    if (participant.subscriptionId) ids.add(participant.subscriptionId);
+  }
+  return [...ids];
 }
 
 export async function getWeekSessionCount(): Promise<number> {

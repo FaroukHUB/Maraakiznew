@@ -1,15 +1,15 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth-utils";
 import { getStudentFullProfile } from "@/data/students";
-import { getConsumedSessionCount } from "@/data/sessions";
+import { getConsumedSessionCounts } from "@/data/sessions";
 import { getStudentProgress, getStudentSkillsForProgram } from "@/data/skills";
+import { getMemorizationForStudent, getMemorizedAyahCount } from "@/data/memorization";
 import {
   LEVEL_LABELS,
   SESSION_STATUS_LABELS,
   PAYMENT_STATUS_LABELS,
   PACK_STATUS_LABELS,
 } from "@/lib/constants";
-import { CONSUMING_STATUSES } from "@/db/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -17,6 +17,7 @@ import { Progress } from "@/components/ui/progress";
 import { EditProfileForm } from "./edit-form";
 import { CloseSubscriptionButton } from "./close-subscription-button";
 import { ProgressSection } from "./progress-section";
+import { MemorizationSection } from "./memorization-section";
 import { Button } from "@/components/ui/button";
 import {
   User,
@@ -29,6 +30,7 @@ import {
   FileText,
   Users,
   ListChecks,
+  BookMarked,
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
@@ -100,15 +102,21 @@ export default async function StudentProfilePage({
     }))
   );
 
-  // Compute consumed counts per subscription
-  const subsWithCounts = await Promise.all(
-    student.subscriptions.map(async (sub) => {
-      const consumed = sub.sessions.filter((s) =>
-        (CONSUMING_STATUSES as readonly string[]).includes(s.status)
-      ).length;
-      return { ...sub, consumed };
-    })
+  // Mémorisation et cycle de révision
+  const memorization = await getMemorizationForStudent(id);
+  const memorizedAyahs = await getMemorizedAyahCount(id);
+
+  // Consommation de chaque forfait — inclut les séances de groupe portées
+  // par le forfait d'une autre élève (voir getConsumedSessionCounts).
+  const consumedBySub = new Map(
+    (await getConsumedSessionCounts(student.subscriptions.map((s) => s.id))).map(
+      (r) => [r.subscriptionId, r.consumed]
+    )
   );
+  const subsWithCounts = student.subscriptions.map((sub) => ({
+    ...sub,
+    consumed: consumedBySub.get(sub.id) ?? 0,
+  }));
 
   const activeSub = subsWithCounts.find((s) => s.status === "active");
 
@@ -341,6 +349,23 @@ export default async function StudentProfilePage({
         </CardHeader>
         <CardContent>
           <ProgressSection studentProfileId={id} programs={progressBlocks} />
+        </CardContent>
+      </Card>
+
+      {/* Mémorisation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <BookMarked className="h-4 w-4" />
+            Mémorisation
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MemorizationSection
+            studentProfileId={id}
+            items={memorization}
+            totalAyahs={memorizedAyahs}
+          />
         </CardContent>
       </Card>
 

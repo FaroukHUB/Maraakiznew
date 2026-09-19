@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { groups, groupMembers, sessions, sessionParticipants } from "@/db/schema";
+import {
+  groups,
+  groupMembers,
+  sessions,
+  sessionParticipants,
+  subscriptions,
+} from "@/db/schema";
 import { getGroupMemberIds } from "@/data/groups";
 
 // ─── Types ───────────────────────────────────────────────
@@ -223,18 +229,42 @@ export async function attachSessionToGroup(
       .where(eq(sessions.id, sessionId));
 
     if (toInsert.length > 0) {
-      await db.insert(sessionParticipants).values(
-        toInsert.map((studentProfileId) => ({
-          sessionId,
-          studentProfileId,
-          attendanceStatus: "present" as const,
-          hasReplayAccess: true,
-        }))
+      // Chaque membre est débitée sur SON forfait du même programme.
+      const owner = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.id, session.subscriptionId),
+      });
+
+      const rows = await Promise.all(
+        toInsert.map(async (studentProfileId) => {
+          const candidates = owner
+            ? await db.query.subscriptions.findMany({
+                where: and(
+                  eq(subscriptions.studentProfileId, studentProfileId),
+                  eq(subscriptions.programId, owner.programId)
+                ),
+                orderBy: (s, { desc }) => [desc(s.createdAt)],
+              })
+            : [];
+
+          return {
+            sessionId,
+            studentProfileId,
+            attendanceStatus: "present" as const,
+            hasReplayAccess: true,
+            subscriptionId:
+              candidates.find((c) => c.status === "active")?.id ??
+              candidates[0]?.id ??
+              null,
+          };
+        })
       );
+
+      await db.insert(sessionParticipants).values(rows);
     }
 
     revalidatePath(`/admin/sessions/${sessionId}`);
     revalidatePath(`/admin/groups/${groupId}`);
+    revalidatePath("/admin/students");
     return { success: true };
   } catch {
     return { success: false, error: "Erreur lors du rattachement au groupe." };

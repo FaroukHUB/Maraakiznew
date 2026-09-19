@@ -18,6 +18,8 @@ async function seed() {
   console.log("Seeding database...");
 
   // ─── Clean existing data (reverse FK order) ──────────
+  await db.delete(schema.memorizationReviews);
+  await db.delete(schema.memorizationItems);
   await db.delete(schema.skillProgress);
   await db.delete(schema.skills);
   await db.delete(schema.groupMembers);
@@ -568,6 +570,56 @@ async function seed() {
   ]);
 
   console.log("  Resources created.");
+
+  // ─── Memorization (hifz) ─────────────────────────────
+  // Quelques portions à des stades différents du cycle de révision,
+  // dont deux déjà en retard, pour que l'écran Révisions ait du contenu.
+  const day = 86_400_000;
+  const relative = (days: number) => new Date(Date.now() + days * day);
+
+  await db.insert(schema.memorizationItems).values([
+    {
+      studentProfileId: profiles[0].id,
+      surahNumber: 114, // An-Nas
+      ayahStart: 1,
+      ayahEnd: 6,
+      memorizedAt: relative(-20),
+      intervalIndex: 2,
+      lastReviewedAt: relative(-10),
+      nextReviewAt: relative(-3), // en retard
+    },
+    {
+      studentProfileId: profiles[0].id,
+      surahNumber: 112, // Al-Ikhlas
+      ayahStart: 1,
+      ayahEnd: 4,
+      memorizedAt: relative(-35),
+      intervalIndex: 4,
+      lastReviewedAt: relative(-5),
+      nextReviewAt: relative(25),
+    },
+    {
+      studentProfileId: profiles[1].id,
+      surahNumber: 78, // An-Naba
+      ayahStart: 1,
+      ayahEnd: 20,
+      memorizedAt: relative(-12),
+      intervalIndex: 1,
+      lastReviewedAt: relative(-9),
+      nextReviewAt: relative(-6), // en retard
+    },
+    {
+      studentProfileId: profiles[1].id,
+      surahNumber: 67, // Al-Mulk
+      ayahStart: 1,
+      ayahEnd: 10,
+      memorizedAt: relative(-2),
+      intervalIndex: 0,
+      nextReviewAt: relative(-1), // à faire
+    },
+  ]);
+
+  console.log("  Memorization items created (4).");
 
   // ─── Done ────────────────────────────────────────────
   console.log("\nSeed complete.");

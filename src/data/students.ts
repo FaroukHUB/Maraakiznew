@@ -1,5 +1,6 @@
 import { eq, sql, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
+import { getConsumedSessionCounts } from "@/data/sessions";
 import {
   users,
   studentProfiles,
@@ -7,7 +8,6 @@ import {
   sessions,
   sessionParticipants,
   payments,
-  CONSUMING_STATUSES,
 } from "@/db/schema";
 
 // ─── Types dérivés pour les vues enrichies ───────────────
@@ -61,14 +61,19 @@ export async function getAllStudentsWithDetails(): Promise<StudentWithDetails[]>
     },
   });
 
+  // Consommation calculée par getConsumedSessionCounts : elle inclut les
+  // séances de groupe portées par le forfait d'une autre élève.
+  const activeSubIds = allProfiles
+    .map((p) => p.subscriptions.find((s) => s.status === "active")?.id)
+    .filter((id): id is string => Boolean(id));
+  const consumedBySub = new Map(
+    (await getConsumedSessionCounts(activeSubIds)).map((r) => [r.subscriptionId, r.consumed])
+  );
+
   return allProfiles.map((profile) => {
     const activeSub = profile.subscriptions.find((s) => s.status === "active") ?? null;
 
-    const completedSessions = activeSub
-      ? activeSub.sessions.filter((s) =>
-          (CONSUMING_STATUSES as readonly string[]).includes(s.status)
-        ).length
-      : 0;
+    const completedSessions = activeSub ? consumedBySub.get(activeSub.id) ?? 0 : 0;
 
     const latestPayment = profile.payments
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];

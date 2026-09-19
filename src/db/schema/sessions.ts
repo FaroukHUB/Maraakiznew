@@ -41,6 +41,32 @@ export const sessionStatusEnum = pgEnum("session_status", [
 
 export const CONSUMING_STATUSES = ["completed", "student_absent"] as const;
 
+// ─── Consommation d'une séance de GROUPE ─────────────────
+//
+// Une séance de groupe réunit plusieurs élèves, chacune avec son propre
+// forfait. La règle ci-dessus ne débite que le forfait porteur de la
+// séance (sessions.subscriptionId). Les autres participantes sont
+// débitées via sessionParticipants.subscriptionId.
+//
+// Statuts de présence qui CONSOMMENT une séance du forfait :
+//   - present / late → elle a eu son cours
+//   - absent         → elle n'est pas venue sans prévenir, séance perdue.
+//                      C'est l'exact équivalent de student_absent.
+//
+// Statut qui NE CONSOMME PAS :
+//   - excused → absence prévenue à l'avance. Même logique que
+//     teacher_absent : ce qui est annoncé ne fait pas perdre la séance.
+//     RÈGLE MÉTIER : si l'institut veut décompter les absences excusées,
+//     il suffit d'ajouter "excused" à cette constante, et rien d'autre.
+//
+// Le forfait porteur n'est jamais compté deux fois : la requête exclut
+// les participations dont le forfait est celui de la séance.
+//
+// Ce commentaire fait foi. Toute query de consommation doit passer par
+// getConsumedSessionCount().
+
+export const CONSUMING_ATTENDANCE_STATUSES = ["present", "late", "absent"] as const;
+
 // ─── Table ───────────────────────────────────────────────
 
 export const sessions = pgTable("sessions", {
@@ -117,4 +143,12 @@ export const sessionParticipants = pgTable("session_participants", {
     .notNull()
     .default("present"),
   hasReplayAccess: boolean("has_replay_access").notNull().default(true),
+  // Forfait débité pour CETTE participante.
+  //
+  // Nullable : les participations enregistrées avant l'introduction de la
+  // consommation collective n'en ont pas, et ne débitent donc rien — le
+  // comportement historique est préservé tel quel.
+  subscriptionId: uuid("subscription_id").references(() => subscriptions.id, {
+    onDelete: "set null",
+  }),
 });
