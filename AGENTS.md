@@ -137,6 +137,26 @@ sans changer de teinte — c'est pour cela que le thème est en oklch. Les
 corrections appliquées sont RENDUES dans l'interface : corriger en douce
 laisserait croire que le choix n'a pas été pris en compte.
 
+**Le halo du bandeau ne peut utiliser que des jetons du THÈME.** Il a
+un temps utilisé `--quran`, une couleur de parcours fixe : le bandeau
+restait turquoise tous les soirs quelle que soit la palette. Le moment de
+la journée fait varier le mélange, jamais la teinte de base. Un test
+compare la liste des `var(--…)` employés aux jetons que `deriveTheme`
+produit réellement.
+
+**L'image du bandeau** vit dans `institute_assets`, en base, et est servie
+par `/api/institute/[key]` avec une empreinte — jamais inscrite dans le
+HTML. Ce choix ne tient que parce que le volume reste minuscule : l'image
+est réduite à 1600 px dans le navigateur et plafonnée à 1,5 Mo. Le type
+déclaré n'est pas cru : les premiers octets sont relus.
+
+Le voile posé par-dessus garantit la lisibilité du salam quelle que soit
+la photo, et ce n'est pas un réglage à l'œil : un test décode la capture
+d'écran, échantillonne le fond réellement composé sous le texte et mesure
+le contraste (5,88 sur une photo noire, pour un seuil de 4,5). Il vérifie
+aussi que la photo est VISIBLE — sans cela, la mesure passerait sur un
+bandeau vide.
+
 Ajouter un bloc au tableau de bord : une entrée dans
 `DASHBOARD_BLOCKS`, et son rendu dans la page. Les préférences déjà
 enregistrées ne le citent pas, donc il apparaît — une nouveauté se voit,

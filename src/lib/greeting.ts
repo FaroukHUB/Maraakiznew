@@ -41,22 +41,45 @@ const MOMENTS: { from: number; moment: Moment; wishFr: string; wishAr: string }[
   { from: 0, moment: "nuit", wishFr: "Bonne nuit", wishAr: "ليلة مباركة" },
 ];
 
-/** Les deux halos du bandeau, par moment. Jetons du thème uniquement. */
+/**
+ * Les deux halos du bandeau, par moment.
+ *
+ * ── La règle ──
+ *
+ * Ils ne peuvent contenir QUE des jetons produits par le thème de
+ * l'institut. Ils ont un temps utilisé `--quran` — une couleur de
+ * parcours, fixe — et le bandeau restait donc turquoise tous les soirs,
+ * quelle que soit la palette choisie. Le moment de la journée fait
+ * varier le MÉLANGE, jamais la teinte de base.
+ * Ce commentaire fait foi.
+ *
+ * `color-mix` sert à foncer ou éclaircir sans sortir de la palette :
+ * mélanger la couleur principale au texte donne un halo de nuit qui
+ * reste celui de l'institut.
+ */
 const AURORA: Record<Moment, { a: string; b: string }> = {
-  aube: { a: "var(--nourania)", b: "var(--primary)" },
-  matin: { a: "var(--primary)", b: "var(--nourania)" },
-  apres_midi: { a: "var(--primary)", b: "var(--quran)" },
-  soir: { a: "var(--quran)", b: "var(--primary)" },
-  nuit: { a: "var(--quran)", b: "var(--accent-foreground)" },
+  aube: {
+    a: "color-mix(in oklab, var(--nourania) 75%, var(--background))",
+    b: "var(--primary)",
+  },
+  matin: {
+    a: "var(--primary)",
+    b: "var(--nourania)",
+  },
+  apres_midi: {
+    a: "var(--primary)",
+    b: "color-mix(in oklab, var(--primary) 45%, var(--nourania))",
+  },
+  soir: {
+    a: "var(--nourania)",
+    b: "var(--primary)",
+  },
+  nuit: {
+    a: "color-mix(in oklab, var(--primary) 70%, var(--foreground))",
+    b: "color-mix(in oklab, var(--nourania) 55%, var(--foreground))",
+  },
 };
 
-/**
- * Le vœu se règle sur l'heure du FUSEAU AFFICHÉ.
- *
- * L'enseignante voit l'heure de son institut ; lui souhaiter « bonne
- * nuit » parce qu'il est 23 h dans le fuseau de son navigateur, alors que
- * son horloge affiche 18 h, serait incohérent à l'écran.
- */
 export function greetingFor(date: Date, timeZone: string): Greeting {
   const hour = hourIn(date, timeZone);
   const entry = MOMENTS.find((m) => hour >= m.from) ?? MOMENTS[MOMENTS.length - 1];

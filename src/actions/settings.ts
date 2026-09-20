@@ -18,6 +18,7 @@ export async function updateSettings(values: {
   timezone?: string;
   themePrimary?: string;
   themeAccent?: string;
+  heroImage?: boolean;
 }): Promise<ActionResult> {
   try {
     if (values.instituteName !== undefined && !values.instituteName.trim()) {
@@ -68,6 +69,8 @@ export async function updateSettings(values: {
       entries.push([SETTING_KEYS.themePrimary, values.themePrimary]);
     if (values.themeAccent !== undefined)
       entries.push([SETTING_KEYS.themeAccent, values.themeAccent]);
+    if (values.heroImage !== undefined)
+      entries.push([SETTING_KEYS.heroImage, values.heroImage ? "on" : "off"]);
 
     for (const [key, value] of entries) {
       await db

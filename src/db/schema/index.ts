@@ -33,6 +33,7 @@ export { posts, postStatusEnum, slugify } from "./posts";
 export { documents, documentTypeEnum } from "./documents";
 export { settings, SETTING_KEYS } from "./settings";
 export { userPreferences } from "./preferences";
+export { instituteAssets, ASSET_KEYS, ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "./assets";
 export {
   courses,
   lessons,
@@ -49,6 +50,7 @@ export {
   generateReferralCode,
 } from "./referrals";
 export type { SettingKey } from "./settings";
+export type { AssetKey } from "./assets";
 export {
   staffMembers,
   payrollEntries,

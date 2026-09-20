@@ -1,16 +1,19 @@
-import { Building2, LayoutDashboard, Palette } from "lucide-react";
+import { Building2, Image as ImageIcon, LayoutDashboard, Palette } from "lucide-react";
 import { requireAdmin } from "@/lib/auth-utils";
 import { getSettings } from "@/data/settings";
 import { getDashboardLayout } from "@/data/preferences";
 import { SettingsForm } from "./settings-form";
 import { ThemeForm } from "./theme-form";
 import { DashboardForm } from "./dashboard-form";
+import { HeroImageForm } from "./hero-image-form";
+import { getAssetUrl } from "@/data/assets";
 
 export default async function AdminSettingsPage() {
   const user = await requireAdmin();
-  const [current, layout] = await Promise.all([
+  const [current, layout, heroImage] = await Promise.all([
     getSettings(),
     getDashboardLayout(user.id),
+    getAssetUrl("hero"),
   ]);
 
   return (
@@ -39,6 +42,14 @@ export default async function AdminSettingsPage() {
         <ThemeForm
           current={{ primary: current.themePrimary, accent: current.themeAccent }}
         />
+      </Section>
+
+      <Section
+        icon={ImageIcon}
+        title="Image du bandeau"
+        description="Une photo derrière le salam, ou rien. Le texte reste lisible dans les deux cas."
+      >
+        <HeroImageForm url={heroImage} enabled={current.heroImage} />
       </Section>
 
       <Section

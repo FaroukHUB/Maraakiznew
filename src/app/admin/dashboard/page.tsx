@@ -25,6 +25,8 @@ import { getAverageProgressByProgram } from "@/data/skills";
 import { getDueReviews } from "@/data/memorization";
 import { getNotifications } from "@/data/notifications";
 import { getStudentZones } from "@/data/timezones";
+import { getAssetUrl } from "@/data/assets";
+import { getSettings } from "@/data/settings";
 import { formatPortion } from "@/lib/quran";
 import {
   GreetingHero,
@@ -47,6 +49,10 @@ export default async function AdminDashboard() {
   const user = await requireAdmin();
   const timeZone = await getInstituteTimezone();
   const layout = await getDashboardLayout(user.id);
+  const [settings, heroImage] = await Promise.all([
+    getSettings(),
+    getAssetUrl("hero"),
+  ]);
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
@@ -458,6 +464,7 @@ export default async function AdminDashboard() {
         timeZone={timeZone}
         zones={isVisible(layout, "hero.zones") ? studentZones.zones : undefined}
         instituteZone={studentZones.instituteZone}
+        imageUrl={settings.heroImage ? heroImage : null}
       />
 
       {shownTiles.length > 0 && (

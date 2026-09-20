@@ -24,6 +24,7 @@ export const SETTING_KEYS = {
   timezone: "institute_timezone",
   themePrimary: "theme_primary",
   themeAccent: "theme_accent",
+  heroImage: "hero_image",
   address: "address",
   invoiceFooter: "invoice_footer",
 } as const;

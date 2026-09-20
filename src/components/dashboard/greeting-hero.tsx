@@ -42,6 +42,7 @@ export function GreetingHero({
   timeZone,
   zones,
   instituteZone,
+  imageUrl,
 }: {
   name: string | null | undefined;
   subtitle: string;
@@ -55,6 +56,11 @@ export function GreetingHero({
   /** Les fuseaux où se trouvent des élèves. Omis, rien ne s'affiche. */
   zones?: ZonePresence[];
   instituteZone?: string;
+  /**
+   * Image de fond du bandeau. Absente, le dégradé seul reste — c'est le
+   * cas par défaut et il se suffit à lui-même.
+   */
+  imageUrl?: string | null;
 }) {
   const now = useNow();
   const greeting = now ? greetingFor(now, timeZone) : null;
@@ -70,6 +76,35 @@ export function GreetingHero({
         } as React.CSSProperties
       }
     >
+      {/*
+        L'image de l'institut, et le voile qui la rend inoffensive pour le
+        texte. Le dégradé part du fond de l'application à gauche — là où
+        vivent le salam et le prénom — et s'efface vers la droite. Une
+        photo très claire comme une photo très sombre donnent donc le même
+        texte lisible : la lisibilité ne dépend pas du choix de l'image.
+        Ce commentaire fait foi.
+      */}
+      {imageUrl && (
+        <>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url("${imageUrl}")` }}
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                // Réglé à la mesure, pas à l'œil : voir le test de
+                // lisibilité. Assez dense à gauche pour le texte, assez
+                // clair à droite pour qu'on voie la photo.
+                "linear-gradient(95deg, color-mix(in oklab, var(--background) 88%, transparent) 0%, color-mix(in oklab, var(--background) 74%, transparent) 45%, color-mix(in oklab, var(--background) 22%, transparent) 100%)",
+            }}
+          />
+        </>
+      )}
+
       {/* Motif en filigrane — décor, jamais lu à voix haute */}
       <Ornament className="pointer-events-none absolute -right-16 -top-20 hidden h-80 w-80 text-primary/[0.07] sm:block" />
 

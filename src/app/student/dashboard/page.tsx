@@ -5,6 +5,8 @@ import { getSessionsByPackId, getLastCompletedSession, getConsumedSessionCount }
 import { getLatestPaymentForStudent } from "@/data/payments";
 import { getInvoicesForStudent } from "@/data/invoices";
 import { GreetingHero, type HeroAction } from "@/components/dashboard/greeting-hero";
+import { getAssetUrl } from "@/data/assets";
+import { getSettings } from "@/data/settings";
 import { getProgramById } from "@/data/programs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +74,10 @@ export default async function StudentDashboard() {
   const lastNotes = lastSession?.notes ?? null;
   const latestPayment = await getLatestPaymentForStudent(student.profile.id);
   const invoices = await getInvoicesForStudent(student.profile.id);
+  const [institute, heroImage] = await Promise.all([
+    getSettings(),
+    getAssetUrl("hero"),
+  ]);
 
   // Les pastilles du bandeau ne montrent que ce qui appelle une action de
   // l'élève. Une file vide ne s'affiche pas.
@@ -108,6 +114,7 @@ export default async function StudentDashboard() {
         }
         actions={heroActions}
         timeZone={timeZone}
+        imageUrl={institute.heroImage ? heroImage : null}
       />
 
       {/* Main cards grid */}

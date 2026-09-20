@@ -15,6 +15,8 @@ export type InstituteSettings = {
   timezone: string;
   themePrimary: string;
   themeAccent: string;
+  /** « on » affiche l'image du bandeau, « off » la garde sans l'afficher. */
+  heroImage: boolean;
 };
 
 const DEFAULTS: InstituteSettings = {
@@ -27,6 +29,7 @@ const DEFAULTS: InstituteSettings = {
   timezone: INSTITUTE_TIMEZONE_FALLBACK,
   themePrimary: DEFAULT_PRIMARY,
   themeAccent: DEFAULT_ACCENT,
+  heroImage: true,
 };
 
 /**
@@ -49,6 +52,7 @@ export async function getSettings(): Promise<InstituteSettings> {
     timezone: readTimezone(byKey[SETTING_KEYS.timezone]),
     themePrimary: readColor(byKey[SETTING_KEYS.themePrimary], DEFAULT_PRIMARY),
     themeAccent: readColor(byKey[SETTING_KEYS.themeAccent], DEFAULT_ACCENT),
+    heroImage: byKey[SETTING_KEYS.heroImage] !== "off",
   };
 }
 
