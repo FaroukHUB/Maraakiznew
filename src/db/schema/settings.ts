@@ -22,6 +22,8 @@ export const SETTING_KEYS = {
   contactEmail: "contact_email",
   whatsappNumber: "whatsapp_number",
   timezone: "institute_timezone",
+  themePrimary: "theme_primary",
+  themeAccent: "theme_accent",
   address: "address",
   invoiceFooter: "invoice_footer",
 } as const;

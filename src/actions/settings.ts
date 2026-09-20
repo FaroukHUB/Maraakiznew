@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { settings, SETTING_KEYS } from "@/db/schema";
 import { isValidTimezone } from "@/lib/timezones";
+import { parseHex } from "@/lib/color";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -15,6 +16,8 @@ export async function updateSettings(values: {
   address?: string;
   invoiceFooter?: string;
   timezone?: string;
+  themePrimary?: string;
+  themeAccent?: string;
 }): Promise<ActionResult> {
   try {
     if (values.instituteName !== undefined && !values.instituteName.trim()) {
@@ -37,6 +40,15 @@ export async function updateSettings(values: {
       return { success: false, error: "Ce fuseau horaire n'est pas reconnu." };
     }
 
+    for (const [label, value] of [
+      ["principale", values.themePrimary],
+      ["seconde", values.themeAccent],
+    ] as const) {
+      if (value !== undefined && !parseHex(value)) {
+        return { success: false, error: `La couleur ${label} n'est pas une couleur valide.` };
+      }
+    }
+
     const entries: [string, string][] = [];
     if (values.instituteName !== undefined)
       entries.push([SETTING_KEYS.instituteName, values.instituteName.trim()]);
@@ -52,6 +64,10 @@ export async function updateSettings(values: {
       entries.push([SETTING_KEYS.invoiceFooter, values.invoiceFooter.trim()]);
     if (values.timezone !== undefined)
       entries.push([SETTING_KEYS.timezone, values.timezone]);
+    if (values.themePrimary !== undefined)
+      entries.push([SETTING_KEYS.themePrimary, values.themePrimary]);
+    if (values.themeAccent !== undefined)
+      entries.push([SETTING_KEYS.themeAccent, values.themeAccent]);
 
     for (const [key, value] of entries) {
       await db
@@ -63,9 +79,12 @@ export async function updateSettings(values: {
         });
     }
 
-    // Le fuseau de l'institut change l'heure affichée sur TOUTES les
-    // pages, des deux espaces : on invalide les deux dispositions, pas
-    // trois chemins choisis à la main.
+    // Le fuseau change l'heure affichée sur TOUTES les pages, et les
+    // couleurs vivent dans la disposition RACINE — qui sert aussi
+    // l'écran de connexion, rendu statiquement. Sans cette dernière
+    // ligne, la connexion garde les anciennes couleurs jusqu'à la
+    // prochaine construction du site. Ce commentaire fait foi.
+    revalidatePath("/", "layout");
     revalidatePath("/admin", "layout");
     revalidatePath("/student", "layout");
     return { success: true };

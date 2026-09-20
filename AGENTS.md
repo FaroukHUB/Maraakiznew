@@ -112,6 +112,36 @@ quel pays vit son élève. Un pays à plusieurs fuseaux — Canada,
 `timezone: null` : deviner y serait faux une fois sur deux, le champ
 reste à remplir à la main et l'interface le dit.
 
+## Personnalisation
+
+Deux choses se personnalisent, et elles ne vivent pas au même endroit :
+
+- **Les couleurs sont celles de l'INSTITUT** (`settings`) : c'est son
+  identité, et les élèves les voient aussi. Deux couleurs suffisent, toute
+  la palette en dérive (`src/lib/theme.ts`).
+- **Le tableau de bord est PERSONNEL** (`user_preferences`) : c'est un plan
+  de travail. Deux enseignantes du même institut ne suivent pas les mêmes
+  choses.
+
+**Ce qui ne se retire jamais : le salam, la date et l'heure.** Ils ne
+figurent pas dans `src/lib/dashboard-blocks.ts` et n'ont pas
+d'interrupteur.
+
+**Ce qui ne se personnalise jamais : les couleurs de statut.** Vert « c'est
+bon », ambre « attention », rouge « il y a un problème ». `deriveTheme`
+ne produit aucun de ces jetons.
+
+**Le garde-fou de contraste.** Toute couleur choisie est assombrie jusqu'à
+atteindre les seuils WCAG (7:1 pour le texte courant, 4,5:1 pour le reste)
+sans changer de teinte — c'est pour cela que le thème est en oklch. Les
+corrections appliquées sont RENDUES dans l'interface : corriger en douce
+laisserait croire que le choix n'a pas été pris en compte.
+
+Ajouter un bloc au tableau de bord : une entrée dans
+`DASHBOARD_BLOCKS`, et son rendu dans la page. Les préférences déjà
+enregistrées ne le citent pas, donc il apparaît — une nouveauté se voit,
+elle ne se cache pas. Une clé disparue est ignorée à la lecture.
+
 ## Décisions en attente de l'institut
 
 1. **Les absences excusées consomment-elles une séance du forfait ?**

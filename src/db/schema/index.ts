@@ -32,6 +32,7 @@ export { invoices, invoiceStatusEnum, computeInvoiceTotal } from "./invoices";
 export { posts, postStatusEnum, slugify } from "./posts";
 export { documents, documentTypeEnum } from "./documents";
 export { settings, SETTING_KEYS } from "./settings";
+export { userPreferences } from "./preferences";
 export {
   courses,
   lessons,
