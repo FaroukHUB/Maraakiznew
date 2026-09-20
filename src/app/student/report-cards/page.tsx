@@ -4,14 +4,12 @@ import { getStudentByUserId } from "@/data/students";
 import { getPublishedReportCards } from "@/data/report-cards";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, ChevronRight } from "lucide-react";
-
-function formatPeriod(start: Date, end: Date): string {
-  const fmt = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" });
-  return `${fmt.format(start)} → ${fmt.format(end)}`;
-}
+import { formatPeriod } from "@/lib/datetime";
+import { getViewerTimezone } from "@/data/timezones";
 
 export default async function StudentReportCardsPage() {
   const user = await requireStudent();
+  const timeZone = await getViewerTimezone(user.id);
   // getStudentByUserId renvoie l'utilisateur, le profil élève est dans
   // .profile — c'est SON id qui référence les bulletins.
   const student = await getStudentByUserId(user.id);
@@ -48,7 +46,7 @@ export default async function StudentReportCardsPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{card.title}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatPeriod(card.periodStart, card.periodEnd)}
+                    {formatPeriod(card.periodStart, card.periodEnd, timeZone)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">

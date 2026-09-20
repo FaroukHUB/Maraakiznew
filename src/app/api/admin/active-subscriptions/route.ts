@@ -30,6 +30,9 @@ export async function GET() {
       programName: sub.program.name,
       totalSessions: sub.totalSessions,
       nextSessionNumber: maxNum + 1,
+      // NULL veut dire « comme l'institut » : le formulaire s'en sert
+      // pour dire à quelle heure l'élève verra la séance.
+      studentTimezone: sub.studentProfile.timezone,
     };
   });
 

@@ -10,18 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { FolderOpen, AlertTriangle, ExternalLink } from "lucide-react";
 import { DocumentForm } from "./document-form";
 import { DeleteDocumentButton } from "./delete-button";
+import { formatDayMonthYear } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date | null): string {
-  if (!date) return "—";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+function formatOrDash(date: Date | null, timeZone: string): string {
+  return date ? formatDayMonthYear(date, timeZone) : "—";
 }
 
 export default async function AdminDocumentsPage() {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const [list, expiring] = await Promise.all([
     getDocumentsForAdmin(),
     getExpiringDocuments(),
@@ -59,7 +57,7 @@ export default async function AdminDocumentsPage() {
                     </p>
                   </div>
                   <span className="text-xs text-destructive shrink-0">
-                    {formatDate(doc.expiresOn)}
+                    {formatOrDash(doc.expiresOn, timeZone)}
                   </span>
                 </div>
               ))}
@@ -120,7 +118,7 @@ export default async function AdminDocumentsPage() {
                       )}
                       {doc.signedOn && (
                         <span className="text-xs text-muted-foreground">
-                          signé le {formatDate(doc.signedOn)}
+                          signé le {formatOrDash(doc.signedOn, timeZone)}
                         </span>
                       )}
                     </div>

@@ -4,10 +4,14 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { useNow } from "@/lib/use-now";
 import { greetingFor, firstName } from "@/lib/greeting";
-import { formatHijri, formatGregorian } from "@/lib/hijri";
+import { formatHijri } from "@/lib/hijri";
+import { formatLongDate } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
+import { zoneLabel } from "@/lib/timezones";
 import { Clock } from "./clock";
 import { Ornament } from "./ornament";
+import { WorldClocks } from "./world-clocks";
+import type { ZonePresence } from "@/data/timezones";
 
 export type HeroAction = {
   label: string;
@@ -35,13 +39,25 @@ export function GreetingHero({
   name,
   subtitle,
   actions,
+  timeZone,
+  zones,
+  instituteZone,
 }: {
   name: string | null | undefined;
   subtitle: string;
   actions: HeroAction[];
+  /**
+   * Fuseau de l'horloge et de la date. Côté administration c'est celui de
+   * l'institut — c'est sur lui que le planning est calé, même si
+   * l'enseignante est en déplacement. Côté élève, le sien.
+   */
+  timeZone: string;
+  /** Les fuseaux où se trouvent des élèves. Omis, rien ne s'affiche. */
+  zones?: ZonePresence[];
+  instituteZone?: string;
 }) {
   const now = useNow();
-  const greeting = now ? greetingFor(now) : null;
+  const greeting = now ? greetingFor(now, timeZone) : null;
   const given = firstName(name);
 
   return (
@@ -106,28 +122,28 @@ export function GreetingHero({
                   •
                 </span>
                 <span className="basis-full text-muted-foreground first-letter:uppercase sm:basis-auto">
-                  {formatGregorian(now)}
+                  {formatLongDate(now, timeZone)}
                 </span>
                 <span className="hidden text-border sm:inline" aria-hidden>
                   •
                 </span>
                 <span dir="auto" className="text-primary/80">
-                  {formatHijri(now)}
+                  {formatHijri(now, timeZone)}
                 </span>
               </>
             ) : null}
           </div>
         </div>
 
-        {/* Horloge */}
+        {/* Horloge, et les fuseaux des élèves sous elle */}
         <div
-          className="shrink-0 rise"
+          className="rise w-full shrink-0 space-y-3 lg:w-64"
           style={{ "--i": 3 } as React.CSSProperties}
         >
-          <div className="inline-flex flex-col items-start lg:items-end rounded-2xl border border-border/60 bg-card/60 px-5 py-3.5 backdrop-blur">
+          <div className="inline-flex w-full flex-col items-start rounded-2xl border border-border/60 bg-card/60 px-5 py-3.5 backdrop-blur lg:items-end">
             <div className="min-h-[3rem] sm:min-h-[3.5rem] flex items-baseline">
               {now ? (
-                <Clock now={now} size="lg" withSeconds />
+                <Clock now={now} timeZone={timeZone} size="lg" withSeconds />
               ) : (
                 <span className="text-4xl sm:text-5xl font-semibold text-transparent select-none">
                   00:00
@@ -135,9 +151,13 @@ export function GreetingHero({
               )}
             </div>
             <p className="mt-1 text-[0.7rem] uppercase tracking-[0.18em] text-muted-foreground">
-              Heure locale
+              Heure de {zoneLabel(timeZone)}
             </p>
           </div>
+
+          {zones && instituteZone && (
+            <WorldClocks zones={zones} instituteZone={instituteZone} />
+          )}
         </div>
       </div>
 

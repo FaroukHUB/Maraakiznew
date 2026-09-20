@@ -21,6 +21,7 @@ export const SETTING_KEYS = {
   instituteTagline: "institute_tagline",
   contactEmail: "contact_email",
   whatsappNumber: "whatsapp_number",
+  timezone: "institute_timezone",
   address: "address",
   invoiceFooter: "invoice_footer",
 } as const;

@@ -8,16 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Clock, Users, CalendarDays, TrendingUp } from "lucide-react";
 import { MembersForm } from "./members-form";
+import { formatDateTime } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 function rateColor(rate: number, rated: number): string {
   if (rated === 0) return "";
@@ -32,6 +25,7 @@ export default async function GroupDetailPage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { id } = await params;
   const group = await getGroupById(id);
   if (!group) notFound();
@@ -169,7 +163,7 @@ export default async function GroupDetailPage({
                     className="block p-3 rounded-lg border border-border hover:bg-accent/30 transition-colors"
                   >
                     <p className="text-sm font-medium capitalize">
-                      {formatDate(session.scheduledAt)}
+                      {formatDateTime(session.scheduledAt, timeZone)}
                     </p>
                     <div className="flex items-center justify-between mt-1.5">
                       <Badge variant="outline" className="text-xs">

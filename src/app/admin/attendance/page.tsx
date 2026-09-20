@@ -13,16 +13,9 @@ import { Button } from "@/components/ui/button";
 import { FiltersWrapper } from "@/components/admin/filters-wrapper";
 import { StatusFilter, MonthFilter } from "@/components/admin/search-filter";
 import { CheckCircle2, XCircle, CalendarClock, TrendingUp, AlertTriangle } from "lucide-react";
+import { formatDateTime } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 function rateColor(rate: number, rated: number): string {
   if (rated === 0) return "";
@@ -43,6 +36,7 @@ export default async function AdminAttendancePage({
   searchParams: Promise<{ group?: string; month?: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { group: groupId, month } = await searchParams;
   const filters = { groupId, month };
 
@@ -214,7 +208,7 @@ export default async function AdminAttendancePage({
                         {session.groupName ?? session.studentName}
                       </p>
                       <p className="text-xs text-muted-foreground capitalize">
-                        {formatDate(session.scheduledAt)}
+                        {formatDateTime(session.scheduledAt, timeZone)}
                       </p>
                       <Badge variant="outline" className="text-xs mt-1.5">
                         {session.reason === "status_pending"

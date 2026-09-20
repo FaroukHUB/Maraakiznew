@@ -8,14 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import { GradingPanel } from "./grading-panel";
+import { formatDate } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
 
 export default async function AdminAssessmentPage({
   params,
@@ -23,6 +18,7 @@ export default async function AdminAssessmentPage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { id } = await params;
   const assessment = await getAssessmentById(id);
   if (!assessment) notFound();
@@ -62,7 +58,7 @@ export default async function AdminAssessmentPage({
           )}
           {assessment.group && <Badge variant="outline">{assessment.group.name}</Badge>}
           <span className="text-sm text-muted-foreground">
-            {formatDate(assessment.heldOn)} · barème {assessment.maxScore}
+            {formatDate(assessment.heldOn, timeZone)} · barème {assessment.maxScore}
           </span>
         </div>
         {assessment.description && (

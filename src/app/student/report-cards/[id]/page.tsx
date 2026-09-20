@@ -6,6 +6,7 @@ import { getReportCardById } from "@/data/report-cards";
 import { ReportCardView } from "@/components/report-card/report-card-view";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "./print-button";
+import { getTimezoneForStudent } from "@/data/timezones";
 
 export default async function StudentReportCardPage({
   params,
@@ -26,6 +27,9 @@ export default async function StudentReportCardPage({
     (user.role === "admin" || card.studentProfileId === student?.profile.id);
   if (!allowed) notFound();
 
+  // L'élève lit la période du bulletin dans SON fuseau.
+  const timeZone = await getTimezoneForStudent(card.studentProfileId);
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between gap-4 print:hidden">
@@ -40,6 +44,7 @@ export default async function StudentReportCardPage({
       </div>
 
       <ReportCardView
+        timeZone={timeZone}
         studentName={card.studentProfile.user.name}
         card={{
           title: card.title,

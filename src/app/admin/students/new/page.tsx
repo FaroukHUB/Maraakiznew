@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { createStudent } from "@/actions/students";
+import { TimezoneSelect } from "@/components/ui/timezone-select";
 
 export default function NewStudentPage() {
   const router = useRouter();
@@ -21,6 +22,8 @@ export default function NewStudentPage() {
   const [localPhone, setLocalPhone] = useState("");
   const [paypalAddress, setPaypalAddress] = useState("");
   const [arabicReadingLevel, setArabicReadingLevel] = useState("debutant");
+  // Vide = « comme l'institut ». Voir schema/student-profiles.ts.
+  const [timezone, setTimezone] = useState("");
   const [previousExperience, setPreviousExperience] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -37,6 +40,7 @@ export default function NewStudentPage() {
       localPhone: localPhone || undefined,
       paypalAddress: paypalAddress || undefined,
       arabicReadingLevel: arabicReadingLevel as "debutant" | "intermediaire" | "avance",
+      timezone: timezone || undefined,
       previousExperience: previousExperience || undefined,
       notes: notes || undefined,
     });
@@ -154,6 +158,20 @@ export default function NewStudentPage() {
                 <option value="intermediaire">Intermédiaire</option>
                 <option value="avance">Avancée</option>
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="timezone">Fuseau horaire</Label>
+              <TimezoneSelect
+                id="timezone"
+                value={timezone}
+                onChange={setTimezone}
+                allowInherit
+              />
+              <p className="text-xs text-muted-foreground">
+                À renseigner seulement si l&apos;élève vit dans un autre
+                fuseau que l&apos;institut. Ses séances lui sont alors
+                affichées à son heure.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Expérience passée</Label>

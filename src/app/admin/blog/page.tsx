@@ -5,18 +5,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Newspaper, Plus, Pin } from "lucide-react";
+import { formatDayMonthYear } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date | null): string {
-  if (!date) return "—";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+function formatOrDash(date: Date | null, timeZone: string): string {
+  return date ? formatDayMonthYear(date, timeZone) : "—";
 }
 
 export default async function AdminBlogPage() {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const list = await getPostsForAdmin();
   const published = list.filter((p) => p.status === "published").length;
 
@@ -73,7 +71,7 @@ export default async function AdminBlogPage() {
                       </Badge>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {formatDate(post.publishedAt)}
+                      {formatOrDash(post.publishedAt, timeZone)}
                     </span>
                   </div>
                 </div>

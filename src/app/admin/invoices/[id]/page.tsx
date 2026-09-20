@@ -5,6 +5,7 @@ import { getInvoiceById } from "@/data/invoices";
 import { InvoiceView } from "@/components/invoice/invoice-view";
 import { ArrowLeft } from "lucide-react";
 import { InvoiceActions } from "./actions-panel";
+import { getInstituteTimezone } from "@/data/settings";
 
 export default async function AdminInvoicePage({
   params,
@@ -12,6 +13,7 @@ export default async function AdminInvoicePage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { id } = await params;
   const invoice = await getInvoiceById(id);
   if (!invoice) notFound();
@@ -29,6 +31,7 @@ export default async function AdminInvoicePage({
       <InvoiceActions id={invoice.id} status={invoice.status} />
 
       <InvoiceView
+        timeZone={timeZone}
         studentName={invoice.studentProfile.user.name}
         invoice={{
           number: invoice.number,

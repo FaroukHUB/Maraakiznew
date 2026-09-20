@@ -20,6 +20,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
+import { formatFullDateTime } from "@/lib/datetime";
+import { getTimezoneForStudent } from "@/data/timezones";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -45,16 +47,6 @@ const resourceLabels: Record<string, string> = {
   link: "Lien",
 };
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 export default async function StudentSessionDetailPage({
   params,
@@ -66,6 +58,7 @@ export default async function StudentSessionDetailPage({
   if (!student) notFound();
 
   const { id } = await params;
+  const timeZone = await getTimezoneForStudent(student.profile.id);
   const session = await getStudentSessionDetail(id, student.profile.id);
   if (!session) notFound();
 
@@ -104,7 +97,7 @@ export default async function StudentSessionDetailPage({
       <div className="flex flex-wrap gap-2 sm:gap-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <CalendarDays className="h-4 w-4" />
-          <span className="capitalize">{formatDate(session.scheduledAt)}</span>
+          <span className="capitalize">{formatFullDateTime(session.scheduledAt, timeZone)}</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />

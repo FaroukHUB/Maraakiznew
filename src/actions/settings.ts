@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { settings, SETTING_KEYS } from "@/db/schema";
+import { isValidTimezone } from "@/lib/timezones";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -13,6 +14,7 @@ export async function updateSettings(values: {
   whatsappNumber?: string;
   address?: string;
   invoiceFooter?: string;
+  timezone?: string;
 }): Promise<ActionResult> {
   try {
     if (values.instituteName !== undefined && !values.instituteName.trim()) {
@@ -31,6 +33,10 @@ export async function updateSettings(values: {
       }
     }
 
+    if (values.timezone !== undefined && !isValidTimezone(values.timezone)) {
+      return { success: false, error: "Ce fuseau horaire n'est pas reconnu." };
+    }
+
     const entries: [string, string][] = [];
     if (values.instituteName !== undefined)
       entries.push([SETTING_KEYS.instituteName, values.instituteName.trim()]);
@@ -44,6 +50,8 @@ export async function updateSettings(values: {
       entries.push([SETTING_KEYS.address, values.address.trim()]);
     if (values.invoiceFooter !== undefined)
       entries.push([SETTING_KEYS.invoiceFooter, values.invoiceFooter.trim()]);
+    if (values.timezone !== undefined)
+      entries.push([SETTING_KEYS.timezone, values.timezone]);
 
     for (const [key, value] of entries) {
       await db

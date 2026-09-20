@@ -9,19 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarClock, AlertTriangle, Video } from "lucide-react";
 import { AppointmentRow } from "./appointment-row";
+import { formatLongDateTime } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 export default async function AdminAppointmentsPage() {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const [upcoming, pending] = await Promise.all([
     getUpcomingAppointments(),
     getPendingAppointments(),
@@ -74,7 +68,7 @@ export default async function AdminAppointmentsPage() {
                         ) : (
                           target.name
                         )}{" "}
-                        · {formatDateTime(appointment.scheduledAt)}
+                        · {formatLongDateTime(appointment.scheduledAt, timeZone)}
                       </p>
                     </div>
                     <AppointmentRow id={appointment.id} />
@@ -118,7 +112,7 @@ export default async function AdminAppointmentsPage() {
                         ) : (
                           target.name
                         )}{" "}
-                        · {formatDateTime(appointment.scheduledAt)} ·{" "}
+                        · {formatLongDateTime(appointment.scheduledAt, timeZone)} ·{" "}
                         {appointment.durationMinutes} min
                       </p>
                     </div>

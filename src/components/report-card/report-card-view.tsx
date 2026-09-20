@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, ClipboardCheck, ListChecks, BookMarked } from "lucide-react";
 import type { ProgramProgressSnapshot } from "@/db/schema";
+import { formatDate } from "@/lib/datetime";
 
 export type ReportCardData = {
   title: string;
@@ -24,13 +25,6 @@ export type ReportCardData = {
   generatedAt: Date;
 };
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
 
 function rateColor(rate: number): string {
   if (rate >= 85) return "text-success";
@@ -47,9 +41,17 @@ function rateColor(rate: number): string {
 export function ReportCardView({
   studentName,
   card,
+  timeZone,
 }: {
   studentName: string;
   card: ReportCardData;
+  /**
+   * Fuseau d'affichage des dates du bulletin. Côté administration c'est
+   * celui de l'institut, côté élève le sien : une période « du 1er au
+   * 30 septembre » ne doit pas devenir « du 31 août » en changeant
+   * d'espace.
+   */
+  timeZone: string;
 }) {
   return (
     <div className="space-y-6 print:space-y-4">
@@ -61,7 +63,7 @@ export function ReportCardView({
             <p className="text-muted-foreground mt-1">{studentName}</p>
             <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5" />
-              Du {formatDate(card.periodStart)} au {formatDate(card.periodEnd)}
+              Du {formatDate(card.periodStart, timeZone)} au {formatDate(card.periodEnd, timeZone)}
             </p>
           </div>
           {card.status === "draft" && (
@@ -207,7 +209,7 @@ export function ReportCardView({
       )}
 
       <p className="text-xs text-muted-foreground">
-        Chiffres relevés le {formatDate(card.generatedAt)}.
+        Chiffres relevés le {formatDate(card.generatedAt, timeZone)}.
       </p>
     </div>
   );

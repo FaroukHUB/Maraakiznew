@@ -27,6 +27,8 @@ import { ParticipantsForm } from "./participants-form";
 import { GroupForm } from "./group-form";
 import { SkillsForm } from "./skills-form";
 import { StaffAssignForm } from "./staff-assign-form";
+import { formatFullDateTime } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -36,16 +38,6 @@ const statusColors: Record<string, string> = {
   teacher_absent: "bg-warning/15 text-warning-foreground border-warning/30",
 };
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 export default async function SessionDetailPage({
   params,
@@ -53,6 +45,7 @@ export default async function SessionDetailPage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { id } = await params;
   const session = await getSessionWithFullDetails(id);
   if (!session) notFound();
@@ -94,7 +87,7 @@ export default async function SessionDetailPage({
             <div>
               <p className="text-xs text-muted-foreground">Date</p>
               <p className="text-sm font-medium capitalize">
-                {formatDate(session.scheduledAt)}
+                {formatFullDateTime(session.scheduledAt, timeZone)}
               </p>
             </div>
           </CardContent>

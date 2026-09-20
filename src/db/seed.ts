@@ -10,6 +10,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { hash } from "bcryptjs";
 import * as schema from "./schema";
+import { instantFromLocalInput } from "../lib/datetime";
+
+/** Le fuseau posé par le seed dans les réglages, plus bas. */
+const INSTITUTE_ZONE = "Europe/Paris";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool, { schema });
@@ -230,9 +234,13 @@ async function seed() {
     },
   ];
 
+  // Trois élèves vivent ailleurs que l'institut : sans cela, l'écran des
+  // fuseaux n'a rien à montrer et le calcul de décalage n'est jamais
+  // exercé. NULL veut dire « comme l'institut ».
+  const zones = [null, "Africa/Algiers", null, "America/Montreal", "Asia/Dubai", null];
   const profiles = await db
     .insert(schema.studentProfiles)
-    .values(profileData)
+    .values(profileData.map((profile, index) => ({ ...profile, timezone: zones[index] ?? null })))
     .returning();
 
   console.log(`  ${profiles.length} student profiles created.`);
@@ -345,13 +353,24 @@ async function seed() {
 
   /**
    * Date de départ telle que la séance `anchor` tombe AUJOURD'HUI, à
-   * l'heure demandée.
+   * l'heure demandée DANS LE FUSEAU DE L'INSTITUT.
+   *
+   * `setHours` poserait l'heure dans le fuseau du processus — UTC ici —
+   * et une séance annoncée à 9 h apparaîtrait à 11 h à Paris. On passe
+   * donc par la même conversion que le formulaire de séance.
    */
   function startSoThat(anchor: number, hour: number, minute: number) {
-    const date = new Date();
-    date.setHours(hour, minute, 0, 0);
-    date.setDate(date.getDate() - dayOffsetOf(anchor));
-    return date;
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: INSTITUTE_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const wall = `${today}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const instant = instantFromLocalInput(wall, INSTITUTE_ZONE);
+    if (!instant) throw new Error(`Heure de séance invalide : ${wall}`);
+    instant.setUTCDate(instant.getUTCDate() - dayOffsetOf(anchor));
+    return instant;
   }
 
   function buildSessions(
@@ -728,6 +747,7 @@ async function seed() {
     { key: "institute_name", value: "Institut Maraakiz" },
     { key: "institute_tagline", value: "Apprendre le Coran, à son rythme" },
     { key: "contact_email", value: "contact@maraakiz.com" },
+    { key: "institute_timezone", value: INSTITUTE_ZONE },
     { key: "whatsapp_number", value: "+33 6 12 34 56 78" },
     { key: "address", value: "12 rue des Écoles, 75005 Paris" },
     {
@@ -736,7 +756,7 @@ async function seed() {
     },
   ]);
 
-  console.log("  Settings created (6).");
+  console.log("  Settings created (7).");
 
   // ─── Groupes ─────────────────────────────────────────
   // Le groupe organise les séances ; chaque élève garde son forfait.

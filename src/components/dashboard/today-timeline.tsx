@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CalendarOff } from "lucide-react";
 import { useNow } from "@/lib/use-now";
+import { formatTime } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 export type TimelineEntry = {
@@ -24,7 +25,18 @@ export type TimelineEntry = {
  * pas de repère. Tant que la page n'est pas hydratée, la liste s'affiche
  * sans repère — jamais au mauvais endroit. Ce commentaire fait foi.
  */
-export function TodayTimeline({ entries }: { entries: TimelineEntry[] }) {
+export function TodayTimeline({
+  entries,
+  timeZone,
+}: {
+  entries: TimelineEntry[];
+  /**
+   * Fuseau d'affichage des heures. C'est celui de l'institut : une
+   * séance de 14 h est à 14 h au planning, où que soit le navigateur qui
+   * regarde. L'heure de l'élève est indiquée à part, quand elle diffère.
+   */
+  timeZone: string;
+}) {
   const now = useNow();
 
   if (entries.length === 0) {
@@ -59,15 +71,12 @@ export function TodayTimeline({ entries }: { entries: TimelineEntry[] }) {
 
       {entries.map((entry, index) => {
         const at = new Date(entry.at);
-        const time = new Intl.DateTimeFormat("fr-FR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }).format(at);
+        const time = formatTime(at, timeZone);
         const past = now ? at.getTime() <= now.getTime() : false;
 
         return (
           <li key={entry.id}>
-            {index === nextIndex && now && <NowMarker now={now} />}
+            {index === nextIndex && now && <NowMarker now={now} timeZone={timeZone} />}
 
             <Link
               href={`/admin/sessions/${entry.id}`}
@@ -114,16 +123,13 @@ export function TodayTimeline({ entries }: { entries: TimelineEntry[] }) {
       })}
 
       {/* La journée est finie : le repère se pose à la fin. */}
-      {now && nextIndex === -1 && <NowMarker now={now} />}
+      {now && nextIndex === -1 && <NowMarker now={now} timeZone={timeZone} />}
     </ol>
   );
 }
 
-function NowMarker({ now }: { now: Date }) {
-  const label = new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(now);
+function NowMarker({ now, timeZone }: { now: Date; timeZone: string }) {
+  const label = formatTime(now, timeZone);
 
   return (
     <div className="relative flex items-center gap-4 py-1.5" aria-hidden>

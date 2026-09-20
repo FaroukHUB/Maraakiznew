@@ -7,14 +7,9 @@ import { Button } from "@/components/ui/button";
 import { GraduationCap, Plus } from "lucide-react";
 import { FiltersWrapper } from "@/components/admin/filters-wrapper";
 import { StatusFilter } from "@/components/admin/search-filter";
+import { formatDayMonthYear } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
 
 export default async function AdminAssessmentsPage({
   searchParams,
@@ -22,6 +17,7 @@ export default async function AdminAssessmentsPage({
   searchParams: Promise<{ type?: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { type } = await searchParams;
   let list = await getAssessmentsForAdmin();
   if (type) list = list.filter((a) => a.type === type);
@@ -86,7 +82,7 @@ export default async function AdminAssessmentsPage({
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {formatDate(assessment.heldOn)}
+                      {formatDayMonthYear(assessment.heldOn, timeZone)}
                     </span>
                   </div>
                 </div>

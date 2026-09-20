@@ -4,12 +4,15 @@ import { MobileNav } from "./mobile-nav";
 import { DateClock } from "./date-clock";
 import { NotificationsBell } from "./notifications-bell";
 import { getNotifications } from "@/data/notifications";
+import { getViewerTimezone } from "@/data/timezones";
 
 export async function Header({ variant }: { variant: "student" | "admin" }) {
   const session = await auth();
   const user = session?.user;
   // Les files de travail ne concernent que l'enseignante.
   const notifications = variant === "admin" ? await getNotifications() : [];
+  // Une élève voit ses heures, l'enseignante celles de l'institut.
+  const timeZone = user?.id ? await getViewerTimezone(user.id) : "UTC";
   const initials = user?.name
     ? user.name
         .split(" ")
@@ -28,7 +31,7 @@ export async function Header({ variant }: { variant: "student" | "admin" }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <DateClock />
+        <DateClock timeZone={timeZone} />
         {variant === "admin" && <NotificationsBell items={notifications} />}
         <span className="text-sm text-muted-foreground hidden sm:inline">
           {user?.name}

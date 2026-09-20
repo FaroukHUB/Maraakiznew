@@ -16,6 +16,8 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { SearchFilter, StatusFilter, MonthFilter } from "@/components/admin/search-filter";
 import { FiltersWrapper } from "@/components/admin/filters-wrapper";
+import { formatDateTime } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -25,15 +27,6 @@ const statusColors: Record<string, string> = {
   teacher_absent: "bg-warning/15 text-warning-foreground border-warning/30",
 };
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 export default async function AdminSessionsPage({
   searchParams,
@@ -41,6 +34,7 @@ export default async function AdminSessionsPage({
   searchParams: Promise<{ q?: string; status?: string; month?: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { q, status: filterStatus, month } = await searchParams;
   let allSessions = await getAllSessionsForAdmin();
 
@@ -105,7 +99,7 @@ export default async function AdminSessionsPage({
           </h3>
           <Card>
             <CardContent className="p-0">
-              <SessionTable sessions={planned} />
+              <SessionTable sessions={planned} timeZone={timeZone} />
             </CardContent>
           </Card>
         </div>
@@ -119,7 +113,7 @@ export default async function AdminSessionsPage({
         <Card>
           <CardContent className="p-0">
             {past.length > 0 ? (
-              <SessionTable sessions={past} />
+              <SessionTable sessions={past} timeZone={timeZone} />
             ) : (
               <p className="text-sm text-muted-foreground text-center py-8">
                 Aucune séance passée.
@@ -134,8 +128,10 @@ export default async function AdminSessionsPage({
 
 function SessionTable({
   sessions,
+  timeZone,
 }: {
   sessions: Awaited<ReturnType<typeof getAllSessionsForAdmin>>;
+  timeZone: string;
 }) {
   return (
     <>
@@ -164,7 +160,7 @@ function SessionTable({
                   <TableCell><span className="font-medium text-sm">{student.user.name}</span></TableCell>
                   <TableCell><span className="text-sm text-muted-foreground">{program.name}</span></TableCell>
                   <TableCell><span className="text-sm">{session.sessionNumber}/{session.subscription.totalSessions}</span></TableCell>
-                  <TableCell><span className="text-sm capitalize">{formatDate(session.scheduledAt)}</span></TableCell>
+                  <TableCell><span className="text-sm capitalize">{formatDateTime(session.scheduledAt, timeZone)}</span></TableCell>
                   <TableCell><span className="text-sm text-muted-foreground">{session.durationMinutes} min</span></TableCell>
                   <TableCell>
                     <Badge variant="outline" className={statusColors[session.status] ?? ""}>
@@ -206,7 +202,7 @@ function SessionTable({
                     {program.name} — Séance {session.sessionNumber}/{session.subscription.totalSessions}
                   </p>
                   <p className="text-xs text-muted-foreground capitalize mt-0.5">
-                    {formatDate(session.scheduledAt)}
+                    {formatDateTime(session.scheduledAt, timeZone)}
                   </p>
                 </div>
                 <Badge variant="outline" className={`text-xs shrink-0 ml-2 ${statusColors[session.status] ?? ""}`}>

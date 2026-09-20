@@ -10,9 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Store } from "lucide-react";
 import { OrderForm } from "./order-form";
+import { formatDate } from "@/lib/datetime";
+import { getViewerTimezone } from "@/data/timezones";
 
 export default async function StudentShopPage() {
   const user = await requireStudent();
+  const timeZone = await getViewerTimezone(user.id);
   // getStudentByUserId renvoie l'utilisateur ; le profil est dans .profile.
   const student = await getStudentByUserId(user.id);
   const [items, orders] = await Promise.all([
@@ -65,11 +68,7 @@ export default async function StudentShopPage() {
                       {order.lines.map((l) => `${l.quantity} × ${l.label}`).join(", ")}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {new Intl.DateTimeFormat("fr-FR", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      }).format(order.createdAt)}
+                      {formatDate(order.createdAt, timeZone)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">

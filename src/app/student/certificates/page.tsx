@@ -4,9 +4,11 @@ import { getCertificatesForStudent } from "@/data/certificates";
 import { CertificateView } from "@/components/certificate/certificate-view";
 import { Card, CardContent } from "@/components/ui/card";
 import { Award } from "lucide-react";
+import { getViewerTimezone } from "@/data/timezones";
 
 export default async function StudentCertificatesPage() {
   const user = await requireStudent();
+  const timeZone = await getViewerTimezone(user.id);
   // getStudentByUserId renvoie l'utilisateur ; le profil est dans .profile.
   const student = await getStudentByUserId(user.id);
   const list = student ? await getCertificatesForStudent(student.profile.id) : [];
@@ -32,6 +34,7 @@ export default async function StudentCertificatesPage() {
           <Card key={certificate.id}>
             <CardContent className="pt-6">
               <CertificateView
+                timeZone={timeZone}
                 studentName=""
                 programName={certificate.program?.name ?? null}
                 certificate={{

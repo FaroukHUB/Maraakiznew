@@ -19,6 +19,8 @@ import {
   ClipboardList,
 } from "lucide-react";
 import Link from "next/link";
+import { formatDate, formatLongDateTime } from "@/lib/datetime";
+import { getTimezoneForStudent } from "@/data/timezones";
 
 function PaymentStatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; className: string }> = {
@@ -31,15 +33,6 @@ function PaymentStatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
 }
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 function formatPrice(cents: number): string {
   return new Intl.NumberFormat("fr-FR", {
@@ -60,6 +53,7 @@ export default async function StudentDashboard() {
     );
   }
 
+  const timeZone = await getTimezoneForStudent(student.profile.id);
   const activePack = await getActivePackForStudent(student.profile.id);
   const program = activePack ? await getProgramById(activePack.programId) : null;
   const completedCount = activePack
@@ -113,6 +107,7 @@ export default async function StudentDashboard() {
           program ? `Parcours ${program.name}` : "Votre espace d'apprentissage"
         }
         actions={heroActions}
+        timeZone={timeZone}
       />
 
       {/* Main cards grid */}
@@ -167,7 +162,7 @@ export default async function StudentDashboard() {
                   Séance {nextSession.sessionNumber}/{totalSessions}
                 </p>
                 <p className="text-sm text-muted-foreground capitalize">
-                  {formatDate(nextSession.scheduledAt)}
+                  {formatLongDateTime(nextSession.scheduledAt, timeZone)}
                 </p>
                 {nextSession.zoomLink && (
                   <a
@@ -204,11 +199,7 @@ export default async function StudentDashboard() {
               {latestPayment?.paidAt && (
                 <p className="text-xs text-muted-foreground">
                   Dernier paiement le{" "}
-                  {new Intl.DateTimeFormat("fr-FR", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  }).format(latestPayment.paidAt)}
+                  {formatDate(latestPayment.paidAt, timeZone)}
                 </p>
               )}
             </div>

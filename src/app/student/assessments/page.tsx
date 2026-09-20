@@ -4,19 +4,18 @@ import { getResultsForStudent, getStudentAverage, TYPE_LABELS } from "@/data/ass
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { GraduationCap } from "lucide-react";
+import { formatDate } from "@/lib/datetime";
+import { getTimezoneForStudent } from "@/data/timezones";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
 
 export default async function StudentAssessmentsPage() {
   const user = await requireStudent();
   // getStudentByUserId renvoie l'utilisateur ; le profil est dans .profile.
   const student = await getStudentByUserId(user.id);
+  const timeZone = student
+    ? await getTimezoneForStudent(student.profile.id)
+    : await getInstituteTimezone();
   const results = student ? await getResultsForStudent(student.profile.id) : [];
   const average = student ? await getStudentAverage(student.profile.id) : null;
 
@@ -54,7 +53,7 @@ export default async function StudentAssessmentsPage() {
                         {TYPE_LABELS[result.assessment.type]}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {formatDate(result.assessment.heldOn)}
+                        {formatDate(result.assessment.heldOn, timeZone)}
                       </span>
                     </div>
                   </div>

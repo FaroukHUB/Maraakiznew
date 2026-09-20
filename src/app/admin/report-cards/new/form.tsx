@@ -7,26 +7,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { createReportCard } from "@/actions/report-cards";
+import { formatMonth } from "@/lib/datetime";
 
 type Student = { profileId: string; name: string };
 
 /** Trimestre écoulé, comme période proposée par défaut. */
-function defaultPeriod(): { start: string; end: string; title: string } {
+/**
+ * La période proposée par défaut : les trois mois clos précédents.
+ *
+ * Le titre nomme les mois dans le fuseau de l'institut : c'est lui qui
+ * définit le trimestre, pas le fuseau du navigateur de qui saisit.
+ */
+function defaultPeriod(timeZone: string): { start: string; end: string; title: string } {
   const now = new Date();
   const end = new Date(now.getFullYear(), now.getMonth(), 0); // fin du mois dernier
   const start = new Date(end.getFullYear(), end.getMonth() - 2, 1);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
-  const label = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
   return {
     start: iso(start),
     end: iso(end),
-    title: `Bulletin — ${label.format(start)} à ${label.format(end)}`,
+    title: `Bulletin — ${formatMonth(start, timeZone)} à ${formatMonth(end, timeZone)}`,
   };
 }
 
-export function NewReportCardForm() {
+export function NewReportCardForm({ timeZone }: { timeZone: string }) {
   const router = useRouter();
-  const preset = defaultPeriod();
+  const preset = defaultPeriod(timeZone);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);

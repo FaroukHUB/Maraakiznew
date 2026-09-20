@@ -5,14 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus } from "lucide-react";
-
-function formatPeriod(start: Date, end: Date): string {
-  const fmt = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" });
-  return `${fmt.format(start)} → ${fmt.format(end)}`;
-}
+import { formatPeriod } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
 export default async function AdminReportCardsPage() {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const cards = await getReportCardsForAdmin();
 
   const drafts = cards.filter((c) => c.status === "draft");
@@ -57,7 +55,7 @@ export default async function AdminReportCardsPage() {
               <h3 className="text-sm font-medium text-muted-foreground mb-3">
                 Brouillons ({drafts.length})
               </h3>
-              <CardList cards={drafts} />
+              <CardList cards={drafts} timeZone={timeZone} />
             </section>
           )}
           <section>
@@ -65,7 +63,7 @@ export default async function AdminReportCardsPage() {
               Publiés ({published.length})
             </h3>
             {published.length > 0 ? (
-              <CardList cards={published} />
+              <CardList cards={published} timeZone={timeZone} />
             ) : (
               <Card>
                 <CardContent className="py-8 text-center text-sm text-muted-foreground">
@@ -82,8 +80,10 @@ export default async function AdminReportCardsPage() {
 
 function CardList({
   cards,
+  timeZone,
 }: {
   cards: Awaited<ReturnType<typeof getReportCardsForAdmin>>;
+  timeZone: string;
 }) {
   return (
     <Card>
@@ -99,7 +99,7 @@ function CardList({
                 {card.studentProfile.user.name} — {card.title}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {formatPeriod(card.periodStart, card.periodEnd)}
+                {formatPeriod(card.periodStart, card.periodEnd, timeZone)}
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">

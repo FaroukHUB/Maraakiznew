@@ -34,6 +34,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
+import { formatDate, formatDateTime } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -56,23 +58,7 @@ const packColors: Record<string, string> = {
   cancelled: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
 
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 function formatPrice(cents: number): string {
   return new Intl.NumberFormat("fr-FR", {
@@ -87,6 +73,7 @@ export default async function StudentProfilePage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { id } = await params;
   const student = await getStudentFullProfile(id);
   if (!student) notFound();
@@ -141,7 +128,7 @@ export default async function StudentProfilePage({
         <div>
           <h2 className="text-2xl font-bold">{user.name}</h2>
           <p className="text-muted-foreground mt-1">
-            Inscrite le {formatDate(user.createdAt)}
+            Inscrite le {formatDate(user.createdAt, timeZone)}
           </p>
         </div>
         {activeSub && (
@@ -258,11 +245,11 @@ export default async function StudentProfilePage({
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
                 Progression : {sub.consumed}/{sub.totalSessions} consommées
-                {sub.startedAt && ` — débuté le ${formatDate(sub.startedAt)}`}
+                {sub.startedAt && ` — débuté le ${formatDate(sub.startedAt, timeZone)}`}
               </span>
               {sub.closedAt && (
                 <span className="text-xs text-muted-foreground">
-                  Fermé le {formatDate(sub.closedAt)}
+                  Fermé le {formatDate(sub.closedAt, timeZone)}
                 </span>
               )}
             </div>
@@ -288,7 +275,7 @@ export default async function StudentProfilePage({
                       #{sess.sessionNumber}
                     </span>
                     <span className="text-sm capitalize truncate">
-                      {formatDateTime(sess.scheduledAt)}
+                      {formatDateTime(sess.scheduledAt, timeZone)}
                     </span>
                     {sess.notes && sess.notes.stopReference && (
                       <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -322,7 +309,7 @@ export default async function StudentProfilePage({
                       <span>
                         {formatPrice(pay.amountCents)} —{" "}
                         {pay.method === "paypal" ? "PayPal" : pay.method === "bank_transfer" ? "Virement" : pay.method}
-                        {pay.paidAt && ` — ${formatDate(pay.paidAt)}`}
+                        {pay.paidAt && ` — ${formatDate(pay.paidAt, timeZone)}`}
                       </span>
                       <Badge
                         variant="outline"
@@ -362,6 +349,7 @@ export default async function StudentProfilePage({
         </CardHeader>
         <CardContent>
           <MemorizationSection
+            timeZone={timeZone}
             studentProfileId={id}
             items={memorization}
             totalAyahs={memorizedAyahs}
@@ -389,7 +377,7 @@ export default async function StudentProfilePage({
                     Séance de{" "}
                     {p.session.subscription.studentProfile.user.name} —{" "}
                     <span className="capitalize">
-                      {formatDateTime(p.session.scheduledAt)}
+                      {formatDateTime(p.session.scheduledAt, timeZone)}
                     </span>
                   </span>
                   <Badge variant="outline" className="text-xs">

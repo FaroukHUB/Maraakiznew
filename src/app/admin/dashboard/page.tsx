@@ -24,6 +24,7 @@ import {
 import { getAverageProgressByProgram } from "@/data/skills";
 import { getDueReviews } from "@/data/memorization";
 import { getNotifications } from "@/data/notifications";
+import { getStudentZones } from "@/data/timezones";
 import { formatPortion } from "@/lib/quran";
 import {
   GreetingHero,
@@ -36,19 +37,13 @@ import {
   type TimelineEntry,
 } from "@/components/dashboard/today-timeline";
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 export default async function AdminDashboard() {
   const user = await requireAdmin();
+  const timeZone = await getInstituteTimezone();
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
@@ -64,6 +59,7 @@ export default async function AdminDashboard() {
     dueReviews,
     todaySessions,
     notifications,
+    studentZones,
   ] = await Promise.all([
     getStudentCount(),
     getWeekSessionCount(),
@@ -76,6 +72,7 @@ export default async function AdminDashboard() {
     getDueReviews(50),
     getTodaySessions(),
     getNotifications(),
+    getStudentZones(),
   ]);
 
   const studentsNeedingRenewal = students.filter(
@@ -123,6 +120,9 @@ export default async function AdminDashboard() {
         name={user.name}
         subtitle="Votre institut, d'un coup d'œil."
         actions={heroActions}
+        timeZone={timeZone}
+        zones={studentZones.zones}
+        instituteZone={studentZones.instituteZone}
       />
 
       {/* Chiffres */}
@@ -220,7 +220,7 @@ export default async function AdminDashboard() {
             }
             action={{ label: "Toutes les séances", href: "/admin/sessions" }}
           >
-            <TodayTimeline entries={timeline} />
+            <TodayTimeline entries={timeline} timeZone={timeZone} />
           </Panel>
 
           <Panel
@@ -344,7 +344,7 @@ export default async function AdminDashboard() {
                           {student?.name ?? "Élève"}
                         </p>
                         <p className="text-xs text-muted-foreground first-letter:uppercase">
-                          {formatDate(session.scheduledAt)}
+                          {formatDateTime(session.scheduledAt, timeZone)}
                         </p>
                       </div>
                       <Badge

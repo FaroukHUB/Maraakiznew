@@ -13,6 +13,7 @@ import {
   deactivateMemorizationItem,
 } from "@/actions/memorization";
 import { ReviewButtons } from "@/app/admin/memorization/review-buttons";
+import { formatDayMonthYear } from "@/lib/datetime";
 
 type Item = {
   id: string;
@@ -25,22 +26,17 @@ type Item = {
   daysOverdue: number;
 };
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
 
 export function MemorizationSection({
   studentProfileId,
   items,
   totalAyahs,
+  timeZone,
 }: {
   studentProfileId: string;
   items: Item[];
   totalAyahs: number;
+  timeZone: string;
 }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
@@ -130,12 +126,12 @@ export function MemorizationSection({
                     </Badge>
                   ) : (
                     <span className="text-xs text-muted-foreground">
-                      Prochaine révision le {formatDate(item.nextReviewAt)}
+                      Prochaine révision le {formatDayMonthYear(item.nextReviewAt, timeZone)}
                     </span>
                   )}
                   {item.lastReviewedAt && (
                     <span className="text-xs text-muted-foreground">
-                      · révisée le {formatDate(item.lastReviewedAt)}
+                      · révisée le {formatDayMonthYear(item.lastReviewedAt, timeZone)}
                     </span>
                   )}
                 </div>

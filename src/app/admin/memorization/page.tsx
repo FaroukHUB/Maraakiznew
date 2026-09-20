@@ -7,14 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BookMarked, AlarmClock } from "lucide-react";
 import { ReviewButtons } from "./review-buttons";
+import { formatDayMonthYear } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
 
 function overdueLabel(days: number): { text: string; className: string } {
   if (days <= 0) return { text: "À faire", className: "text-primary border-primary/30" };
@@ -25,6 +20,7 @@ function overdueLabel(days: number): { text: string; className: string } {
 
 export default async function AdminMemorizationPage() {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const due = await getDueReviews();
 
   // Regroupées par élève : on révise avec une élève, pas avec une portion.
@@ -102,7 +98,7 @@ export default async function AdminMemorizationPage() {
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                               {item.lastReviewedAt
-                                ? `Dernière révision le ${formatDate(item.lastReviewedAt)}`
+                                ? `Dernière révision le ${formatDayMonthYear(item.lastReviewedAt, timeZone)}`
                                 : "Jamais révisée"}
                             </span>
                           </div>

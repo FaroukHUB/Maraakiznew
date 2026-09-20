@@ -1,5 +1,7 @@
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { settings, SETTING_KEYS } from "@/db/schema";
+import { INSTITUTE_TIMEZONE_FALLBACK, isValidTimezone } from "@/lib/timezones";
 
 export type InstituteSettings = {
   instituteName: string;
@@ -8,6 +10,7 @@ export type InstituteSettings = {
   whatsappNumber: string;
   address: string;
   invoiceFooter: string;
+  timezone: string;
 };
 
 const DEFAULTS: InstituteSettings = {
@@ -17,6 +20,7 @@ const DEFAULTS: InstituteSettings = {
   whatsappNumber: "",
   address: "",
   invoiceFooter: "",
+  timezone: INSTITUTE_TIMEZONE_FALLBACK,
 };
 
 /**
@@ -36,7 +40,30 @@ export async function getSettings(): Promise<InstituteSettings> {
     whatsappNumber: byKey[SETTING_KEYS.whatsappNumber] ?? DEFAULTS.whatsappNumber,
     address: byKey[SETTING_KEYS.address] ?? DEFAULTS.address,
     invoiceFooter: byKey[SETTING_KEYS.invoiceFooter] ?? DEFAULTS.invoiceFooter,
+    timezone: readTimezone(byKey[SETTING_KEYS.timezone]),
   };
+}
+
+/**
+ * Le fuseau de l'institut, seul.
+ *
+ * Les pages n'ont presque jamais besoin des autres réglages : cette
+ * fonction évite de charger tout le bloc pour une seule chaîne.
+ */
+export async function getInstituteTimezone(): Promise<string> {
+  const row = await db.query.settings.findFirst({
+    where: eq(settings.key, SETTING_KEYS.timezone),
+  });
+  return readTimezone(row?.value ?? undefined);
+}
+
+/**
+ * Un fuseau enregistré peut être vide, ou devenu invalide si la base IANA
+ * a changé. Dans les deux cas on retombe sur celui de l'institut plutôt
+ * que de laisser `Intl` lever une exception en plein rendu.
+ */
+function readTimezone(value: string | undefined): string {
+  return value && isValidTimezone(value) ? value : INSTITUTE_TIMEZONE_FALLBACK;
 }
 
 /** Numéro WhatsApp au format attendu par wa.me : chiffres seulement. */

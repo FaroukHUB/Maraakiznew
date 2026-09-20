@@ -4,9 +4,11 @@ import { getInvoicesForStudent, formatAmount } from "@/data/invoices";
 import { InvoiceView } from "@/components/invoice/invoice-view";
 import { Card, CardContent } from "@/components/ui/card";
 import { Receipt } from "lucide-react";
+import { getViewerTimezone } from "@/data/timezones";
 
 export default async function StudentInvoicesPage() {
   const user = await requireStudent();
+  const timeZone = await getViewerTimezone(user.id);
   // getStudentByUserId renvoie l'utilisateur ; le profil est dans .profile.
   const student = await getStudentByUserId(user.id);
   const list = student ? await getInvoicesForStudent(student.profile.id) : [];
@@ -38,6 +40,7 @@ export default async function StudentInvoicesPage() {
           <Card key={invoice.id}>
             <CardContent className="pt-6">
               <InvoiceView
+                timeZone={timeZone}
                 studentName=""
                 invoice={{
                   number: invoice.number,

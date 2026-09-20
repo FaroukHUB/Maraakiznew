@@ -6,16 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { ProspectPanel } from "./prospect-panel";
+import { formatDateTime } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 export default async function ProspectDetailPage({
   params,
@@ -23,6 +16,7 @@ export default async function ProspectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { id } = await params;
   const prospect = await getProspectById(id);
   if (!prospect) notFound();
@@ -104,7 +98,7 @@ export default async function ProspectDetailPage({
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{appointment.title}</p>
                     <p className="text-xs text-muted-foreground capitalize">
-                      {formatDateTime(appointment.scheduledAt)} · {appointment.durationMinutes} min
+                      {formatDateTime(appointment.scheduledAt, timeZone)} · {appointment.durationMinutes} min
                     </p>
                   </div>
                   <Badge variant="outline" className="text-xs shrink-0">

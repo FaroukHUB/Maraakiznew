@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { MENTION_LABELS } from "@/data/certificates";
 import type { CertificateBasis } from "@/db/schema";
+import { formatDate } from "@/lib/datetime";
 
 export type CertificateData = {
   reference: string | null;
@@ -15,13 +16,8 @@ export type CertificateData = {
   revocationReason: string | null;
 };
 
-function formatDate(date: Date | null): string {
-  if (!date) return "—";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
+function formatOrDash(date: Date | null, timeZone: string): string {
+  return date ? formatDate(date, timeZone) : "—";
 }
 
 /** Rendu d'un diplôme, partagé entre admin, élève et impression. */
@@ -29,10 +25,13 @@ export function CertificateView({
   studentName,
   programName,
   certificate,
+  timeZone,
 }: {
   studentName: string;
   programName: string | null;
   certificate: CertificateData;
+  /** Fuseau d'affichage des dates : institut côté admin, élève côté élève. */
+  timeZone: string;
 }) {
   const b = certificate.basis;
 
@@ -116,13 +115,13 @@ export function CertificateView({
         </div>
         <div className="text-right">
           <p className="text-muted-foreground text-xs">Délivré le</p>
-          <p>{formatDate(certificate.issuedOn)}</p>
+          <p>{formatOrDash(certificate.issuedOn, timeZone)}</p>
         </div>
       </div>
 
       {certificate.status === "revoked" && (
         <p className="text-sm text-destructive text-center">
-          Ce diplôme a été révoqué le {formatDate(certificate.revokedAt)}
+          Ce diplôme a été révoqué le {formatOrDash(certificate.revokedAt, timeZone)}
           {certificate.revocationReason && ` — ${certificate.revocationReason}`}
         </p>
       )}

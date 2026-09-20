@@ -5,6 +5,7 @@ import { getReportCardById } from "@/data/report-cards";
 import { ReportCardView } from "@/components/report-card/report-card-view";
 import { ArrowLeft } from "lucide-react";
 import { ReportCardActions } from "./actions-panel";
+import { getInstituteTimezone } from "@/data/settings";
 
 export default async function AdminReportCardPage({
   params,
@@ -15,6 +16,8 @@ export default async function AdminReportCardPage({
   const { id } = await params;
   const card = await getReportCardById(id);
   if (!card) notFound();
+
+  const timeZone = await getInstituteTimezone();
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -33,6 +36,7 @@ export default async function AdminReportCardPage({
       />
 
       <ReportCardView
+        timeZone={timeZone}
         studentName={card.studentProfile.user.name}
         card={{
           title: card.title,

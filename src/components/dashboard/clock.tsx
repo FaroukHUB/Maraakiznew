@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { clockParts } from "@/lib/datetime";
 
 /**
  * L'heure, en chiffres.
@@ -10,21 +11,24 @@ import { cn } from "@/lib/utils";
  * `Intl.DateTimeFormat("fr-FR", { hour: "2-digit" })` rend « 11 h » :
  * la locale française colle son séparateur à l'heure. Pour poser un
  * deux-points qui clignote entre les heures et les minutes, il faut les
- * deux nombres séparément — donc getHours/getMinutes, formatés à la main
- * sur 24 h. Ce commentaire fait foi.
+ * deux nombres séparément — d'où `clockParts`.
+ *
+ * L'horloge affiche l'heure d'un FUSEAU, pas celle du navigateur : une
+ * enseignante en déplacement doit voir l'heure de son institut, celle sur
+ * laquelle son planning est calé. Ce commentaire fait foi.
  */
 export function Clock({
   now,
+  timeZone,
   size = "sm",
   withSeconds = false,
 }: {
   now: Date;
+  timeZone: string;
   size?: "sm" | "lg";
   withSeconds?: boolean;
 }) {
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
+  const { hours, minutes, seconds } = clockParts(now, timeZone);
 
   const big = size === "lg";
 

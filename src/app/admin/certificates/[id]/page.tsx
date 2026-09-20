@@ -5,6 +5,7 @@ import { getCertificateById } from "@/data/certificates";
 import { CertificateView } from "@/components/certificate/certificate-view";
 import { ArrowLeft } from "lucide-react";
 import { CertificateActions } from "./actions-panel";
+import { getInstituteTimezone } from "@/data/settings";
 
 export default async function AdminCertificatePage({
   params,
@@ -12,6 +13,7 @@ export default async function AdminCertificatePage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const { id } = await params;
   const certificate = await getCertificateById(id);
   if (!certificate) notFound();
@@ -33,6 +35,7 @@ export default async function AdminCertificatePage({
       />
 
       <CertificateView
+        timeZone={timeZone}
         studentName={certificate.studentProfile.user.name}
         programName={certificate.program?.name ?? null}
         certificate={{

@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { formatAmount } from "@/data/invoices";
 import type { InvoiceLine } from "@/db/schema";
+import { formatDate } from "@/lib/datetime";
 
 export type InvoiceData = {
   number: string | null;
@@ -29,22 +30,20 @@ const STATUS_CLASSES: Record<InvoiceData["status"], string> = {
   cancelled: "text-destructive border-destructive/30",
 };
 
-function formatDate(date: Date | null): string {
-  if (!date) return "—";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
+function formatOrDash(date: Date | null, timeZone: string): string {
+  return date ? formatDate(date, timeZone) : "—";
 }
 
 /** Rendu d'une facture, partagé entre l'admin, l'élève et l'impression. */
 export function InvoiceView({
   studentName,
   invoice,
+  timeZone,
 }: {
   studentName: string;
   invoice: InvoiceData;
+  /** Fuseau d'affichage des dates : institut côté admin, élève côté élève. */
+  timeZone: string;
 }) {
   return (
     <div className="space-y-6">
@@ -63,11 +62,11 @@ export function InvoiceView({
       <div className="grid gap-4 sm:grid-cols-2 text-sm">
         <div>
           <span className="text-muted-foreground">Date d&apos;émission : </span>
-          {formatDate(invoice.issueDate)}
+          {formatOrDash(invoice.issueDate, timeZone)}
         </div>
         <div>
           <span className="text-muted-foreground">Échéance : </span>
-          {formatDate(invoice.dueDate)}
+          {formatOrDash(invoice.dueDate, timeZone)}
         </div>
       </div>
 
@@ -113,13 +112,13 @@ export function InvoiceView({
 
       {invoice.status === "paid" && invoice.paidAt && (
         <p className="text-sm text-success">
-          Réglée le {formatDate(invoice.paidAt)}.
+          Réglée le {formatOrDash(invoice.paidAt, timeZone)}.
         </p>
       )}
 
       {invoice.status === "cancelled" && (
         <p className="text-sm text-destructive">
-          Annulée le {formatDate(invoice.cancelledAt)}
+          Annulée le {formatOrDash(invoice.cancelledAt, timeZone)}
           {invoice.cancellationReason && ` — ${invoice.cancellationReason}`}
         </p>
       )}

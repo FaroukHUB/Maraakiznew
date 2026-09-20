@@ -14,6 +14,8 @@
  * n'a qu'un tableau à modifier, ici.
  */
 
+import { hourIn } from "./timezones";
+
 export type Moment = "aube" | "matin" | "apres_midi" | "soir" | "nuit";
 
 export type Greeting = {
@@ -48,8 +50,15 @@ const AURORA: Record<Moment, { a: string; b: string }> = {
   nuit: { a: "var(--quran)", b: "var(--accent-foreground)" },
 };
 
-export function greetingFor(date: Date): Greeting {
-  const hour = date.getHours();
+/**
+ * Le vœu se règle sur l'heure du FUSEAU AFFICHÉ.
+ *
+ * L'enseignante voit l'heure de son institut ; lui souhaiter « bonne
+ * nuit » parce qu'il est 23 h dans le fuseau de son navigateur, alors que
+ * son horloge affiche 18 h, serait incohérent à l'écran.
+ */
+export function greetingFor(date: Date, timeZone: string): Greeting {
+  const hour = hourIn(date, timeZone);
   const entry = MOMENTS.find((m) => hour >= m.from) ?? MOMENTS[MOMENTS.length - 1];
 
   return {

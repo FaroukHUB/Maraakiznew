@@ -29,6 +29,15 @@ export const studentProfiles = pgTable("student_profiles", {
   whatsappPhone: varchar("whatsapp_phone", { length: 20 }),
   localPhone: varchar("local_phone", { length: 20 }),
   paypalAddress: varchar("paypal_address", { length: 255 }),
+  /**
+   * Fuseau horaire de l'élève, au format IANA (« America/Montreal »).
+   *
+   * NULL veut dire « celui de l'institut ». C'est le cas courant — la
+   * plupart des élèves sont dans le même pays — et cela évite d'avoir à
+   * ressaisir le fuseau à chaque inscription. Une valeur n'est posée que
+   * lorsqu'elle DIFFÈRE. Ce commentaire fait foi.
+   */
+  timezone: varchar("timezone", { length: 64 }),
   arabicReadingLevel: arabicReadingLevelEnum("arabic_reading_level").notNull(),
   previousExperience: text("previous_experience"),
   notes: text("notes"), // notes privées de l'admin sur l'élève

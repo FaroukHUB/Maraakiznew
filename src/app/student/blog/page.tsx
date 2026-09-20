@@ -4,18 +4,16 @@ import { getPublishedPosts } from "@/data/posts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Newspaper, Pin, ChevronRight } from "lucide-react";
+import { formatDate } from "@/lib/datetime";
+import { getViewerTimezone } from "@/data/timezones";
 
-function formatDate(date: Date | null): string {
-  if (!date) return "";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
+function formatOrDash(date: Date | null, timeZone: string): string {
+  return date ? formatDate(date, timeZone) : "—";
 }
 
 export default async function StudentBlogPage() {
-  await requireStudent();
+  const viewer = await requireStudent();
+  const timeZone = await getViewerTimezone(viewer.id);
   const list = await getPublishedPosts();
 
   return (
@@ -58,7 +56,7 @@ export default async function StudentBlogPage() {
                           </Badge>
                         )}
                         <span className="text-xs text-muted-foreground">
-                          {formatDate(post.publishedAt)}
+                          {formatOrDash(post.publishedAt, timeZone)}
                         </span>
                       </div>
                     </div>

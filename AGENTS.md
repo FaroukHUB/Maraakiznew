@@ -77,6 +77,34 @@ L'horloge est un `<time dateTime="HH:MM">` avec `aria-label` : son contenu
 est découpé pour faire clignoter le deux-points, et se lirait sinon
 « 11 : 23 ».
 
+## Fuseaux horaires
+
+**Aucun affichage de date ou d'heure ne se fait sans fuseau explicite.**
+Sans `timeZone`, `Intl` prend celui du PROCESSUS — UTC sur Vercel — et
+une séance de 18 h à Paris s'affiche 16 h, pour tout le monde, sans que
+rien n'ait l'air cassé. C'est le bug qui existait avant : les 38 appels
+directs à `Intl.DateTimeFormat` ont tous été remplacés.
+
+- `src/lib/timezones.ts` : la liste des fuseaux, les décalages, le
+  changement de quantième, les heures calmes (`QUIET_HOURS`).
+- `src/lib/datetime.ts` : le formatage. **Toutes ses fonctions exigent un
+  fuseau** — c'est ce qui empêche la faute de revenir. Aucun
+  `new Intl.DateTimeFormat` ne doit réapparaître ailleurs pour une date
+  métier.
+- `instantFromLocalInput` : une saisie `datetime-local` se lit dans le
+  fuseau de l'INSTITUT, pas celui du navigateur. Le comportement aux deux
+  heures qui n'existent pas normalement (changement d'heure) est décrit
+  dans le fichier et couvert par les tests.
+
+Qui voit quoi : côté administration, le fuseau de l'institut
+(`getInstituteTimezone`) — c'est sur lui que le planning est calé, même
+si l'enseignante est en déplacement. Côté élève, le sien
+(`getTimezoneForStudent`). Un en-tête partagé passe par
+`getViewerTimezone`.
+
+Le fuseau d'une élève est NULL par défaut : cela veut dire « celui de
+l'institut ». On ne pose une valeur que lorsqu'elle DIFFÈRE.
+
 ## Décisions en attente de l'institut
 
 1. **Les absences excusées consomment-elles une séance du forfait ?**

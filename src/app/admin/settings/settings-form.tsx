@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { updateSettings } from "@/actions/settings";
+import { TimezoneSelect } from "@/components/ui/timezone-select";
 
 type Settings = {
   instituteName: string;
@@ -15,6 +16,7 @@ type Settings = {
   whatsappNumber: string;
   address: string;
   invoiceFooter: string;
+  timezone: string;
 };
 
 export function SettingsForm({ current }: { current: Settings }) {
@@ -67,6 +69,19 @@ export function SettingsForm({ current }: { current: Settings }) {
                 placeholder="L'excellence au service de la transmission"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="timezone">Fuseau horaire de l&apos;institut</Label>
+            <TimezoneSelect
+              id="timezone"
+              value={values.timezone}
+              onChange={(value) => set("timezone", value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Toutes les heures du planning sont exprimées dans ce fuseau.
+              Une élève qui vit ailleurs voit les siennes, converties.
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

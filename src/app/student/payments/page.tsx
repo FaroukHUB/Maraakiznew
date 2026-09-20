@@ -3,6 +3,8 @@ import { getStudentByUserId } from "@/data/students";
 import { getPaymentsByStudentId } from "@/data/payments";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/datetime";
+import { getViewerTimezone } from "@/data/timezones";
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; className: string }> = {
@@ -21,6 +23,7 @@ function formatPrice(cents: number): string {
 
 export default async function PaymentsPage() {
   const user = await requireStudent();
+  const timeZone = await getViewerTimezone(user.id);
   const student = await getStudentByUserId(user.id);
   if (!student) return <p className="text-muted-foreground">Profil introuvable.</p>;
 
@@ -44,7 +47,7 @@ export default async function PaymentsPage() {
                 <p className="text-xs text-muted-foreground capitalize">
                   {payment.method === "paypal" ? "PayPal" : payment.method} —{" "}
                   {payment.paidAt
-                    ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" }).format(payment.paidAt)
+                    ? formatDate(payment.paidAt, timeZone)
                     : "Non payé"}
                 </p>
               </div>

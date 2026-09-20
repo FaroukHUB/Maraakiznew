@@ -10,6 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Plus, TrendingUp } from "lucide-react";
+import { formatDayMonthYear } from "@/lib/datetime";
+import { getInstituteTimezone } from "@/data/settings";
 
 const STATUS_CLASSES: Record<string, string> = {
   new: "text-primary border-primary/30",
@@ -19,16 +21,10 @@ const STATUS_CLASSES: Record<string, string> = {
   lost: "text-muted-foreground",
 };
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
 
 export default async function AdminProspectsPage() {
   await requireAdmin();
+  const timeZone = await getInstituteTimezone();
   const [list, funnel] = await Promise.all([getProspectsForAdmin(), getFunnelStats()]);
 
   return (
@@ -111,7 +107,7 @@ export default async function AdminProspectsPage() {
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {formatDate(prospect.createdAt)}
+                      {formatDayMonthYear(prospect.createdAt, timeZone)}
                     </span>
                   </div>
                 </div>
