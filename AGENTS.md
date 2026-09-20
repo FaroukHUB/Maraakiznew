@@ -105,6 +105,13 @@ si l'enseignante est en déplacement. Côté élève, le sien
 Le fuseau d'une élève est NULL par défaut : cela veut dire « celui de
 l'institut ». On ne pose une valeur que lorsqu'elle DIFFÈRE.
 
+**Le fuseau se saisit par le PAYS** (`src/lib/countries.ts`) : personne ne
+sait par cœur qu'on écrit « Africa/Casablanca », tout le monde sait dans
+quel pays vit son élève. Un pays à plusieurs fuseaux — Canada,
+États-Unis, Russie, Australie, Brésil, Indonésie, Mexique — porte
+`timezone: null` : deviner y serait faux une fois sur deux, le champ
+reste à remplir à la main et l'interface le dit.
+
 ## Décisions en attente de l'institut
 
 1. **Les absences excusées consomment-elles une séance du forfait ?**

@@ -7,6 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateStudentProfile } from "@/actions/students";
 import { Pencil } from "lucide-react";
+import {
+  CountryTimezoneFields,
+  type AddressValues,
+} from "@/components/ui/country-timezone-fields";
 
 type ProfileData = {
   profileId: string;
@@ -18,9 +22,20 @@ type ProfileData = {
   arabicReadingLevel: string;
   previousExperience: string | null;
   notes: string | null;
+  addressLine: string | null;
+  postalCode: string | null;
+  city: string | null;
+  country: string | null;
+  timezone: string | null;
 };
 
-export function EditProfileForm({ data }: { data: ProfileData }) {
+export function EditProfileForm({
+  data,
+  instituteZoneLabel,
+}: {
+  data: ProfileData;
+  instituteZoneLabel: string;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,6 +50,13 @@ export function EditProfileForm({ data }: { data: ProfileData }) {
   const [level, setLevel] = useState(data.arabicReadingLevel);
   const [experience, setExperience] = useState(data.previousExperience ?? "");
   const [notes, setNotes] = useState(data.notes ?? "");
+  const [address, setAddress] = useState<AddressValues>({
+    addressLine: data.addressLine ?? "",
+    postalCode: data.postalCode ?? "",
+    city: data.city ?? "",
+    country: data.country ?? "",
+    timezone: data.timezone ?? "",
+  });
 
   if (!editing) {
     return (
@@ -60,6 +82,7 @@ export function EditProfileForm({ data }: { data: ProfileData }) {
       arabicReadingLevel: level as "debutant" | "intermediaire" | "avance",
       previousExperience: experience,
       notes,
+      ...address,
     });
 
     if (result.success) {
@@ -108,6 +131,17 @@ export function EditProfileForm({ data }: { data: ProfileData }) {
           </select>
         </div>
       </div>
+      <div className="space-y-2 rounded-lg border border-border/70 bg-accent/20 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Adresse et fuseau horaire
+        </p>
+        <CountryTimezoneFields
+          values={address}
+          onChange={setAddress}
+          instituteZoneLabel={instituteZoneLabel}
+        />
+      </div>
+
       <div className="space-y-1">
         <Label className="text-xs">Expérience</Label>
         <textarea

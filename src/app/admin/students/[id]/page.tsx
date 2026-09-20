@@ -19,23 +19,13 @@ import { CloseSubscriptionButton } from "./close-subscription-button";
 import { ProgressSection } from "./progress-section";
 import { MemorizationSection } from "./memorization-section";
 import { Button } from "@/components/ui/button";
-import {
-  User,
-  Phone,
-  Plus,
-  Mail,
-  CreditCard,
-  BookOpen,
-  CalendarDays,
-  FileText,
-  Users,
-  ListChecks,
-  BookMarked,
-  ArrowLeft,
-} from "lucide-react";
+import { ArrowLeft, BookMarked, BookOpen, CalendarDays, CreditCard, FileText, Globe, ListChecks, Mail, MapPin, Phone, Plus, User, Users } from "lucide-react";
 import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/datetime";
 import { getInstituteTimezone } from "@/data/settings";
+import { formatAddress } from "@/lib/countries";
+import { zoneLabel } from "@/lib/timezones";
+import { StudentLocalTime } from "@/components/dashboard/student-local-time";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -79,6 +69,7 @@ export default async function StudentProfilePage({
   if (!student) notFound();
 
   const user = student.user;
+  const address = formatAddress(student);
 
   // Progression : un bloc par programme suivi, avec son référentiel
   const progressByProgram = await getStudentProgress(id);
@@ -181,6 +172,20 @@ export default async function StudentProfilePage({
               <BookOpen className="h-4 w-4 text-muted-foreground" />
               <span>Niveau : {LEVEL_LABELS[student.arabicReadingLevel] ?? student.arabicReadingLevel}</span>
             </div>
+            {address && (
+              <div className="flex items-start gap-2 text-sm sm:col-span-2">
+                <MapPin className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+                <span>{address}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-sm sm:col-span-2">
+              <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <StudentLocalTime
+                timeZone={student.timezone ?? timeZone}
+                instituteZone={timeZone}
+                firstName={user.name.split(" ")[0]}
+              />
+            </div>
             {student.previousExperience && (
               <div className="sm:col-span-2 text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Expérience : </span>
@@ -206,7 +211,13 @@ export default async function StudentProfilePage({
               arabicReadingLevel: student.arabicReadingLevel,
               previousExperience: student.previousExperience,
               notes: student.notes,
+              addressLine: student.addressLine,
+              postalCode: student.postalCode,
+              city: student.city,
+              country: student.country,
+              timezone: student.timezone,
             }}
+            instituteZoneLabel={zoneLabel(timeZone)}
           />
         </CardContent>
       </Card>

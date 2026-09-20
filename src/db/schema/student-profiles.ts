@@ -30,6 +30,19 @@ export const studentProfiles = pgTable("student_profiles", {
   localPhone: varchar("local_phone", { length: 20 }),
   paypalAddress: varchar("paypal_address", { length: 255 }),
   /**
+   * Adresse postale.
+   *
+   * Le PAYS est le champ qui compte : c'est lui qui donne le fuseau
+   * horaire (voir `lib/countries.ts`). Le reste sert aux documents et au
+   * contact. Tout est facultatif — une élève peut s'inscrire sans donner
+   * son adresse. Ce commentaire fait foi.
+   */
+  addressLine: varchar("address_line", { length: 255 }),
+  postalCode: varchar("postal_code", { length: 20 }),
+  city: varchar("city", { length: 120 }),
+  /** Code ISO à deux lettres, « FR », « DZ »… */
+  country: varchar("country", { length: 2 }),
+  /**
    * Fuseau horaire de l'élève, au format IANA (« America/Montreal »).
    *
    * NULL veut dire « celui de l'institut ». C'est le cas courant — la

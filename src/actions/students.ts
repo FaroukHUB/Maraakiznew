@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users, studentProfiles } from "@/db/schema";
 import { isValidTimezone } from "@/lib/timezones";
+import { countryByCode } from "@/lib/countries";
 
 type ActionResult = { success: true; id?: string } | { success: false; error: string };
 
@@ -18,6 +19,10 @@ export async function createStudent(data: {
   localPhone?: string;
   paypalAddress?: string;
   arabicReadingLevel: "debutant" | "intermediaire" | "avance";
+  addressLine?: string;
+  postalCode?: string;
+  city?: string;
+  country?: string;
   timezone?: string;
   previousExperience?: string;
   notes?: string;
@@ -52,6 +57,10 @@ export async function createStudent(data: {
         localPhone: data.localPhone || null,
         paypalAddress: data.paypalAddress || null,
         arabicReadingLevel: data.arabicReadingLevel,
+        addressLine: data.addressLine?.trim() || null,
+        postalCode: data.postalCode?.trim() || null,
+        city: data.city?.trim() || null,
+        country: normalizeCountry(data.country),
         timezone: normalizeTimezone(data.timezone),
         previousExperience: data.previousExperience || null,
         notes: data.notes || null,
@@ -77,6 +86,10 @@ export async function updateStudentProfile(
     localPhone?: string;
     paypalAddress?: string;
     arabicReadingLevel?: "debutant" | "intermediaire" | "avance";
+    addressLine?: string;
+    postalCode?: string;
+    city?: string;
+    country?: string;
     timezone?: string;
     previousExperience?: string;
     notes?: string;
@@ -112,6 +125,10 @@ export async function updateStudentProfile(
         ...(data.whatsappPhone !== undefined && { whatsappPhone: data.whatsappPhone || null }),
         ...(data.localPhone !== undefined && { localPhone: data.localPhone || null }),
         ...(data.paypalAddress !== undefined && { paypalAddress: data.paypalAddress || null }),
+        ...(data.addressLine !== undefined && { addressLine: data.addressLine.trim() || null }),
+        ...(data.postalCode !== undefined && { postalCode: data.postalCode.trim() || null }),
+        ...(data.city !== undefined && { city: data.city.trim() || null }),
+        ...(data.country !== undefined && { country: normalizeCountry(data.country) }),
         ...(data.timezone !== undefined && { timezone: normalizeTimezone(data.timezone) }),
         ...(data.arabicReadingLevel && { arabicReadingLevel: data.arabicReadingLevel }),
         ...(data.previousExperience !== undefined && { previousExperience: data.previousExperience || null }),
@@ -136,4 +153,13 @@ export async function updateStudentProfile(
 function normalizeTimezone(value: string | undefined): string | null {
   if (!value || !isValidTimezone(value)) return null;
   return value;
+}
+
+/**
+ * Un pays inconnu de la liste n'est pas enregistré : le code sert à
+ * retrouver un nom et un fuseau, une valeur libre ne servirait à rien.
+ */
+function normalizeCountry(value: string | undefined): string | null {
+  if (!value) return null;
+  return countryByCode(value) ? value : null;
 }
