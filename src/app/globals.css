@@ -136,6 +136,222 @@
   }
 }
 
+/* ─── Effets ───────────────────────────────────────────────
+
+   Trois règles tiennent tout ce bloc :
+
+   1. Aucune animation n'est nécessaire à la lecture. Chaque effet part
+      d'un état déjà lisible, ou se joue en `backwards` depuis un état
+      final correct. Une animation qui ne se lance pas ne doit jamais
+      laisser un écran vide ou un chiffre à zéro.
+   2. `prefers-reduced-motion` coupe TOUT mouvement, d'un seul bloc en
+      fin de fichier. Rien ne bouge, tout reste lisible.
+   3. Les couleurs viennent des jetons du thème, jamais d'une valeur
+      écrite en dur : changer la palette doit suffire.
+
+   Ce commentaire fait foi. */
+
+/* Le dégradé « aurore » : deux halos qui dérivent lentement derrière le
+   bandeau d'accueil. La teinte vient de --aurora-a / --aurora-b, posées
+   par le composant selon le moment de la journée. */
+.aurora {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  /* La taille est bornée : à 85 % d'un bandeau large le halo reste
+     dedans, mais sur un téléphone les décalages le poussaient hors du
+     cadre et il ne restait rien à voir. Le minimum le ramène. */
+  width: max(85%, 22rem);
+  aspect-ratio: 1.1;
+  border-radius: 50%;
+  /* Le flou doit rester GRAND devant le halo : un flou trop court laisse
+     un bord net, et le dégradé se lit alors comme une tache. */
+  filter: blur(110px);
+  opacity: 0.5;
+  will-change: transform;
+}
+
+.aurora::before {
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--aurora-a, var(--primary)) 0%,
+    transparent 70%
+  );
+  top: -45%;
+  left: -18%;
+  animation: aurora-drift-a 26s ease-in-out infinite alternate;
+}
+
+.aurora::after {
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--aurora-b, var(--nourania)) 0%,
+    transparent 70%
+  );
+  bottom: -50%;
+  right: -12%;
+  animation: aurora-drift-b 32s ease-in-out infinite alternate;
+}
+
+/* Le liseré clair du haut : ce qui fait qu'une surface translucide se lit
+   comme du verre et non comme un aplat pâle. */
+.glass-edge {
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklab, white 55%, transparent),
+    0 1px 3px 0 color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+@keyframes aurora-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(18%, 12%, 0) scale(1.25); }
+}
+
+@keyframes aurora-drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to   { transform: translate3d(-14%, -16%, 0) scale(0.9); }
+}
+
+/* Un grain très fin, posé au-dessus des dégradés : sans lui, un aplat
+   flouté sur grande surface montre des bandes sur certains écrans. */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Entrée en cascade. `backwards` garantit que l'élément est déjà à son
+   état final si l'animation ne démarre pas. --i porte le rang. */
+.rise {
+  animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* Carte en verre : fond translucide, liseré clair en haut, et au survol
+   un halo qui suit la couleur d'accent de la carte (--tile). */
+.glass {
+  background: color-mix(in oklab, var(--card) 72%, transparent);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}
+
+.tile {
+  position: relative;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s ease, border-color 0.35s ease;
+}
+
+.tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    140deg,
+    color-mix(in oklab, var(--tile, var(--primary)) 55%, transparent),
+    transparent 55%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 34px -16px color-mix(in oklab, var(--tile, var(--primary)) 60%, transparent);
+}
+
+.tile:hover::before {
+  opacity: 1;
+}
+
+/* Anneau de progression. Le tracé part du vide et rejoint --offset ;
+   sans animation, il s'affiche directement à la bonne valeur. */
+.ring-track {
+  stroke: color-mix(in oklab, currentColor 14%, transparent);
+}
+
+.ring-value {
+  stroke-dashoffset: var(--offset);
+  animation: ring-fill 1.1s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 55ms + 120ms);
+}
+
+@keyframes ring-fill {
+  from { stroke-dashoffset: var(--circumference); }
+  to   { stroke-dashoffset: var(--offset); }
+}
+
+/* Barre de progression : même principe, la largeur finale est posée en
+   style inline et l'animation ne fait que l'atteindre. */
+.bar-fill {
+  animation: bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms + 150ms);
+}
+
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* Le deux-points de l'horloge bat une fois par seconde. */
+.tick {
+  animation: tick 1s steps(2, jump-none) infinite;
+}
+
+@keyframes tick {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.25; }
+}
+
+/* Personne ne doit subir le mouvement. Un seul bloc, en dernier. */
+@media (prefers-reduced-motion: reduce) {
+  .aurora::before,
+  .aurora::after,
+  .rise,
+  .ring-value,
+  .bar-fill,
+  .tick {
+    animation: none !important;
+  }
+
+  .tile {
+    transition: none;
+  }
+
+  .tile:hover {
+    transform: none;
+  }
+}
+
 /* ─── Impression d'un bulletin ─────────────────────────────
    Le bulletin doit sortir sur papier comme un document, pas comme une
    capture d'écran : sans navigation, sans boutons, sans fonds colorés qui

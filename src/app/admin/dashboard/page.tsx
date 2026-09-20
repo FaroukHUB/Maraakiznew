@@ -1,15 +1,41 @@
+import Link from "next/link";
+import {
+  AlertTriangle,
+  BookMarked,
+  CalendarDays,
+  ClipboardCheck,
+  CreditCard,
+  ListChecks,
+  Sun,
+  Users,
+} from "lucide-react";
 import { requireAdmin } from "@/lib/auth-utils";
 import { getStudentCount, getAllStudentsWithDetails } from "@/data/students";
-import { getWeekSessionCount, getUpcomingSessions } from "@/data/sessions";
+import {
+  getWeekSessionCount,
+  getUpcomingSessions,
+  getTodaySessions,
+} from "@/data/sessions";
 import { getPendingPaymentCount } from "@/data/payments";
-import { getAttendanceStats, getSessionsNeedingAttendance } from "@/data/attendance";
+import {
+  getAttendanceStats,
+  getSessionsNeedingAttendance,
+} from "@/data/attendance";
 import { getAverageProgressByProgram } from "@/data/skills";
 import { getDueReviews } from "@/data/memorization";
+import { getNotifications } from "@/data/notifications";
 import { formatPortion } from "@/lib/quran";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  GreetingHero,
+  type HeroAction,
+} from "@/components/dashboard/greeting-hero";
+import { StatTile } from "@/components/dashboard/stat-tile";
+import { Panel } from "@/components/dashboard/panel";
+import {
+  TodayTimeline,
+  type TimelineEntry,
+} from "@/components/dashboard/today-timeline";
 import { Badge } from "@/components/ui/badge";
-import { Users, CalendarDays, CreditCard, AlertTriangle, ClipboardCheck, ListChecks, BookMarked } from "lucide-react";
-import Link from "next/link";
 
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("fr-FR", {
@@ -22,7 +48,7 @@ function formatDate(date: Date): string {
 }
 
 export default async function AdminDashboard() {
-  await requireAdmin();
+  const user = await requireAdmin();
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
@@ -36,6 +62,8 @@ export default async function AdminDashboard() {
     sessionsToProcess,
     progressByProgram,
     dueReviews,
+    todaySessions,
+    notifications,
   ] = await Promise.all([
     getStudentCount(),
     getWeekSessionCount(),
@@ -46,204 +74,185 @@ export default async function AdminDashboard() {
     getSessionsNeedingAttendance(),
     getAverageProgressByProgram(),
     getDueReviews(50),
+    getTodaySessions(),
+    getNotifications(),
   ]);
 
   const studentsNeedingRenewal = students.filter(
     (s) =>
-      s.activePack &&
-      s.completedSessions >= s.activePack.totalSessions - 1
+      s.activePack && s.completedSessions >= s.activePack.totalSessions - 1,
   );
 
+  // Les pastilles du bandeau reprennent les files de travail — même
+  // source que la cloche de l'en-tête, jamais un second calcul.
+  const heroActions: HeroAction[] = notifications.slice(0, 4).map((n) => ({
+    label: n.label,
+    count: n.count,
+    href: n.href,
+    tone: n.tone === "urgent" ? "warning" : "primary",
+  }));
+
+  const timeline: TimelineEntry[] = todaySessions.map((session) => {
+    const studentName =
+      session.subscription?.studentProfile?.user?.name ?? null;
+    const groupName = session.group?.name ?? null;
+    return {
+      id: session.id,
+      at: session.scheduledAt.toISOString(),
+      title: groupName ?? studentName ?? "Séance",
+      detail:
+        groupName && studentName
+          ? studentName
+          : (session.subscription?.program?.name ?? null),
+      status:
+        session.status === "planned"
+          ? "planned"
+          : session.status === "completed"
+            ? "completed"
+            : session.status === "cancelled"
+              ? "cancelled"
+              : "other",
+    };
+  });
+
+  const doneToday = timeline.filter((e) => e.status === "completed").length;
+
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Tableau de bord</h2>
-        <p className="text-muted-foreground mt-1">
-          Vue d&apos;ensemble de votre activité
-        </p>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <GreetingHero
+        name={user.name}
+        subtitle="Votre institut, d'un coup d'œil."
+        actions={heroActions}
+      />
+
+      {/* Chiffres */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <StatTile
+          index={0}
+          label="Élèves"
+          value={studentCount}
+          hint={`${students.filter((s) => s.activePack).length} avec un forfait actif`}
+          href="/admin/students"
+          icon={Users}
+          tone="primary"
+        />
+        <StatTile
+          index={1}
+          label="Séances cette semaine"
+          value={weekSessions}
+          hint={
+            timeline.length > 0
+              ? `${timeline.length} aujourd'hui, ${doneToday} déjà faite${doneToday > 1 ? "s" : ""}`
+              : "Rien au programme aujourd'hui"
+          }
+          href="/admin/sessions"
+          icon={CalendarDays}
+          tone="quran"
+        />
+        <StatTile
+          index={2}
+          label="Assiduité ce mois"
+          value={attendance.rated > 0 ? attendance.rate : "—"}
+          suffix={attendance.rated > 0 ? "%" : undefined}
+          ratio={attendance.rated > 0 ? attendance.rate : undefined}
+          hint={
+            sessionsToProcess.length > 0
+              ? `${sessionsToProcess.length} séance${sessionsToProcess.length > 1 ? "s" : ""} sans appel`
+              : "Appel fait sur toutes les séances"
+          }
+          href="/admin/attendance"
+          icon={ClipboardCheck}
+          tone="success"
+        />
+        <StatTile
+          index={3}
+          label="Révisions dues"
+          value={dueReviews.length}
+          hint={
+            dueReviews.length > 0
+              ? `${dueReviews.filter((r) => r.daysOverdue > 7).length} en retard de plus d'une semaine`
+              : "Le cycle est à jour"
+          }
+          href="/admin/memorization"
+          icon={BookMarked}
+          tone="nourania"
+        />
+        <StatTile
+          index={4}
+          label="Paiements en attente"
+          value={pendingPayments}
+          hint={pendingPayments > 0 ? "À relancer" : "Rien à relancer"}
+          href="/admin/payments"
+          icon={CreditCard}
+          tone="warning"
+        />
+        <StatTile
+          index={5}
+          label="Forfaits à renouveler"
+          value={studentsNeedingRenewal.length}
+          hint={
+            studentsNeedingRenewal.length > 0
+              ? studentsNeedingRenewal
+                  .map((s) => s.name)
+                  .slice(0, 2)
+                  .join(", ")
+              : "Aucun forfait en fin de course"
+          }
+          href="/admin/subscriptions/new"
+          icon={AlertTriangle}
+          tone="destructive"
+        />
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <Card>
-          <CardContent className="flex items-center gap-4 pt-6">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Users className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Élèves</p>
-              <p className="text-2xl font-bold">{studentCount}</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Deux colonnes explicites plutôt qu'une grille à trous : un
+          panneau court ne doit pas laisser un vide sous lui pendant que
+          le panneau voisin s'allonge. */}
+      <div className="grid gap-5 lg:grid-cols-3">
+        <div className="space-y-5 lg:col-span-2">
+          <Panel
+            index={6}
+            title="Aujourd'hui"
+            icon={Sun}
+            subtitle={
+              timeline.length > 0
+                ? `${timeline.length} séance${timeline.length > 1 ? "s" : ""} · ${doneToday} traitée${doneToday > 1 ? "s" : ""}`
+                : undefined
+            }
+            action={{ label: "Toutes les séances", href: "/admin/sessions" }}
+          >
+            <TodayTimeline entries={timeline} />
+          </Panel>
 
-        <Card>
-          <CardContent className="flex items-center gap-4 pt-6">
-            <div className="h-12 w-12 rounded-xl bg-quran/10 flex items-center justify-center">
-              <CalendarDays className="h-6 w-6 text-quran" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Séances cette semaine</p>
-              <p className="text-2xl font-bold">{weekSessions}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Link href="/admin/memorization">
-          <Card className="h-full hover:border-primary/40 transition-colors">
-            <CardContent className="flex items-center gap-4 pt-6">
-              <div className="h-12 w-12 rounded-xl bg-quran/10 flex items-center justify-center">
-                <BookMarked className="h-6 w-6 text-quran" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Révisions dues</p>
-                <p className="text-2xl font-bold">{dueReviews.length}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/admin/attendance">
-          <Card className="h-full hover:border-primary/40 transition-colors">
-            <CardContent className="flex items-center gap-4 pt-6">
-              <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
-                <ClipboardCheck className="h-6 w-6 text-success" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Assiduité ce mois</p>
-                <p className="text-2xl font-bold">
-                  {attendance.rated > 0 ? `${attendance.rate}%` : "—"}
-                </p>
-                {sessionsToProcess.length > 0 && (
-                  <p className="text-xs text-warning-foreground">
-                    {sessionsToProcess.length} séance
-                    {sessionsToProcess.length > 1 ? "s" : ""} à traiter
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 pt-6">
-            <div className="h-12 w-12 rounded-xl bg-warning/10 flex items-center justify-center">
-              <CreditCard className="h-6 w-6 text-warning-foreground" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Paiements en attente</p>
-              <p className="text-2xl font-bold">{pendingPayments}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 pt-6">
-            <div className="h-12 w-12 rounded-xl bg-nourania/10 flex items-center justify-center">
-              <AlertTriangle className="h-6 w-6 text-nourania-foreground" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">A renouveler</p>
-              <p className="text-2xl font-bold">{studentsNeedingRenewal.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Progression par programme */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <ListChecks className="h-4 w-4" />
-                Progression par programme
-              </span>
-              <Link
-                href="/admin/skills"
-                className="text-sm text-primary hover:underline font-normal"
-              >
-                Référentiel
-              </Link>
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Moyenne des élèves avec un forfait actif
-            </p>
-          </CardHeader>
-          <CardContent>
-            {progressByProgram.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                Aucun forfait actif.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {progressByProgram.map((program) => (
-                  <div key={program.programId}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium">{program.programName}</span>
-                      <span className="text-sm font-bold">
-                        {program.total > 0 ? `${program.rate}%` : "—"}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-primary"
-                        style={{ width: `${program.rate}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {program.total === 0
-                        ? "Référentiel vide"
-                        : `${program.total} compétence${
-                            program.total > 1 ? "s" : ""
-                          } · ${program.studentCount} élève${
-                            program.studentCount > 1 ? "s" : ""
-                          }`}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Révisions urgentes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <BookMarked className="h-4 w-4" />
-                Révisions urgentes
-              </span>
-              <Link
-                href="/admin/memorization"
-                className="text-sm text-primary hover:underline font-normal"
-              >
-                Tout voir
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          <Panel
+            index={8}
+            title="Révisions urgentes"
+            icon={BookMarked}
+            action={{ label: "Tout voir", href: "/admin/memorization" }}
+          >
             {dueReviews.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                Aucune révision en attente
-              </p>
+              <Empty>Aucune révision en attente.</Empty>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {dueReviews.slice(0, 5).map((item) => (
                   <Link
                     key={item.id}
                     href="/admin/memorization"
-                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border hover:bg-accent/30 transition-colors"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border/60 p-2.5 transition-colors hover:border-primary/30 hover:bg-accent/30"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{item.studentName}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {formatPortion(item.surahNumber, item.ayahStart, item.ayahEnd)}
+                      <p className="truncate text-sm font-medium">
+                        {item.studentName}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {formatPortion(
+                          item.surahNumber,
+                          item.ayahStart,
+                          item.ayahEnd,
+                        )}
                       </p>
                     </div>
                     <span
-                      className={`text-xs shrink-0 ${
+                      className={`shrink-0 text-xs tabular-nums ${
                         item.daysOverdue > 7
                           ? "text-destructive"
                           : "text-muted-foreground"
@@ -256,80 +265,114 @@ export default async function AdminDashboard() {
                   </Link>
                 ))}
                 {dueReviews.length > 5 && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    et {dueReviews.length - 5} autre{dueReviews.length - 5 > 1 ? "s" : ""}
+                  <p className="pt-1 text-center text-xs text-muted-foreground">
+                    et {dueReviews.length - 5} autre
+                    {dueReviews.length - 5 > 1 ? "s" : ""}
                   </p>
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </Panel>
+        </div>
 
-        {/* Upcoming sessions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center justify-between">
-              Prochaines séances
-              <Link
-                href="/admin/sessions"
-                className="text-sm text-primary hover:underline font-normal"
-              >
-                Tout voir
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {upcomingSessions.length > 0 ? (
-              <div className="space-y-3">
+        <div className="space-y-5">
+          <Panel
+            index={7}
+            title="Progression"
+            icon={ListChecks}
+            subtitle="Moyenne par programme, élèves avec un forfait actif"
+            action={{ label: "Référentiel", href: "/admin/skills" }}
+          >
+            {progressByProgram.length === 0 ? (
+              <Empty>Aucun forfait actif.</Empty>
+            ) : (
+              <div className="space-y-4">
+                {progressByProgram.map((program, index) => (
+                  <div key={program.programId}>
+                    <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                      <span className="truncate text-sm font-medium">
+                        {program.programName}
+                      </span>
+                      <span className="shrink-0 text-sm font-bold tabular-nums">
+                        {program.total > 0 ? `${program.rate}%` : "—"}
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="bar-fill h-full origin-left rounded-full bg-gradient-to-r from-primary to-nourania"
+                        style={
+                          {
+                            width: `${program.rate}%`,
+                            "--i": index,
+                          } as React.CSSProperties
+                        }
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {program.total === 0
+                        ? "Référentiel vide"
+                        : `${program.total} compétence${program.total > 1 ? "s" : ""} · ${program.studentCount} élève${program.studentCount > 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel
+            index={9}
+            title="Prochaines séances"
+            icon={CalendarDays}
+            action={{ label: "Tout voir", href: "/admin/sessions" }}
+          >
+            {upcomingSessions.length === 0 ? (
+              <Empty>Aucune séance planifiée.</Empty>
+            ) : (
+              <div className="space-y-1">
                 {upcomingSessions.map((session) => {
                   const student = students.find(
-                    (s) => s.activePack?.id === session.subscriptionId
+                    (s) => s.activePack?.id === session.subscriptionId,
                   );
                   return (
-                    <div
+                    <Link
                       key={session.id}
-                      className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                      href={`/admin/sessions/${session.id}`}
+                      className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-accent/40"
                     >
-                      <div>
-                        <p className="text-sm font-medium">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
                           {student?.name ?? "Élève"}
                         </p>
-                        <p className="text-xs text-muted-foreground capitalize">
+                        <p className="text-xs text-muted-foreground first-letter:uppercase">
                           {formatDate(session.scheduledAt)}
                         </p>
                       </div>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-xs tabular-nums"
+                      >
                         {session.sessionNumber}/
                         {student?.activePack?.totalSessions ?? 8}
                       </Badge>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Aucune séance planifiée
-              </p>
             )}
-          </CardContent>
-        </Card>
+          </Panel>
 
-        {/* Alerts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Alertes</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <Panel index={10} title="Alertes" icon={AlertTriangle}>
             <div className="space-y-3">
               {studentsNeedingRenewal.length > 0 && (
-                <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
+                <div className="rounded-xl border border-warning/25 bg-warning/10 p-3">
                   <p className="text-sm font-medium text-warning-foreground">
                     Forfaits bientôt terminés
                   </p>
                   <ul className="mt-2 space-y-1">
                     {studentsNeedingRenewal.map((s) => (
                       <li key={s.id} className="text-xs text-muted-foreground">
-                        {s.name} — {s.completedSessions}/{s.activePack?.totalSessions} séances
+                        {s.name} — {s.completedSessions}/
+                        {s.activePack?.totalSessions} séances
                       </li>
                     ))}
                   </ul>
@@ -337,13 +380,14 @@ export default async function AdminDashboard() {
               )}
 
               {pendingPayments > 0 && (
-                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-3">
                   <p className="text-sm font-medium text-destructive">
-                    {pendingPayments} paiement{pendingPayments > 1 ? "s" : ""} en attente
+                    {pendingPayments} paiement{pendingPayments > 1 ? "s" : ""}{" "}
+                    en attente
                   </p>
                   <Link
                     href="/admin/payments"
-                    className="text-xs text-primary hover:underline mt-1 inline-block"
+                    className="mt-1 inline-block text-xs text-primary hover:underline"
                   >
                     Voir les détails
                   </Link>
@@ -351,14 +395,18 @@ export default async function AdminDashboard() {
               )}
 
               {studentsNeedingRenewal.length === 0 && pendingPayments === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Tout est en ordre !
-                </p>
+                <Empty>Tout est en ordre.</Empty>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </Panel>
+        </div>
       </div>
     </div>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>
   );
 }

@@ -327,7 +327,33 @@ async function seed() {
   console.log(`  ${subs.length} subscriptions created.`);
 
   // ─── Sessions ────────────────────────────────────────
-  // Helper: create sessions for a subscription
+  //
+  // Les séances sont ANCRÉES SUR AUJOURD'HUI, pas sur une date écrite en
+  // dur. Un jeu de démonstration figé en 2025 donne un tableau de bord
+  // vide — « aucune séance aujourd'hui », « aucune séance planifiée » —
+  // et on ne peut alors rien vérifier de ce que l'écran doit montrer.
+  // Ce commentaire fait foi.
+
+  /**
+   * Rang du jour d'une séance dans son forfait, au rythme de deux par
+   * semaine : la 1re à J+0, la 2e à J+3, la 3e à J+7, et ainsi de suite.
+   */
+  function dayOffsetOf(sessionNumber: number) {
+    const i = sessionNumber - 1;
+    return Math.floor(i / 2) * 7 + (i % 2) * 3;
+  }
+
+  /**
+   * Date de départ telle que la séance `anchor` tombe AUJOURD'HUI, à
+   * l'heure demandée.
+   */
+  function startSoThat(anchor: number, hour: number, minute: number) {
+    const date = new Date();
+    date.setHours(hour, minute, 0, 0);
+    date.setDate(date.getDate() - dayOffsetOf(anchor));
+    return date;
+  }
+
   function buildSessions(
     subId: string,
     completedCount: number,
@@ -337,10 +363,8 @@ async function seed() {
   ) {
     return Array.from({ length: total }, (_, i) => {
       const n = i + 1;
-      const dayOffset =
-        Math.floor((n - 1) / 2) * 7 + ((n - 1) % 2) * 3;
       const date = new Date(startDate);
-      date.setDate(date.getDate() + dayOffset);
+      date.setDate(date.getDate() + dayOffsetOf(n));
 
       return {
         subscriptionId: subId,
@@ -355,13 +379,16 @@ async function seed() {
     });
   }
 
+  // Deux séances déjà faites ce matin, quatre à venir dans la journée :
+  // de quoi voir le repère « maintenant » se placer au milieu de la
+  // chronologie, quelle que soit l'heure d'ouverture.
   const allSessions = [
-    ...buildSessions(subs[0].id, 5, new Date("2025-03-17"), 8, 60), // Amina 5/8
-    ...buildSessions(subs[1].id, 6, new Date("2025-03-10"), 8, 45), // Khadija 6/8
-    ...buildSessions(subs[2].id, 5, new Date("2025-03-17"), 8, 60), // Sarah 5/8
-    ...buildSessions(subs[3].id, 7, new Date("2025-03-03"), 8, 60), // Fatima 7/8
-    ...buildSessions(subs[4].id, 2, new Date("2025-03-24"), 8, 60), // Nour 2/8
-    ...buildSessions(subs[5].id, 7, new Date("2025-03-03"), 8, 60), // Yasmine 7/8
+    ...buildSessions(subs[0].id, 5, startSoThat(5, 9, 0), 8, 60), // Amina 5/8
+    ...buildSessions(subs[1].id, 6, startSoThat(7, 14, 0), 8, 45), // Khadija 6/8
+    ...buildSessions(subs[2].id, 5, startSoThat(5, 10, 30), 8, 60), // Sarah 5/8
+    ...buildSessions(subs[3].id, 7, startSoThat(8, 16, 0), 8, 60), // Fatima 7/8
+    ...buildSessions(subs[4].id, 2, startSoThat(3, 17, 30), 8, 60), // Nour 2/8
+    ...buildSessions(subs[5].id, 7, startSoThat(8, 18, 30), 8, 60), // Yasmine 7/8
   ];
 
   const insertedSessions = await db

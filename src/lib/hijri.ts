@@ -21,6 +21,22 @@ export function formatHijri(date: Date = new Date()): string {
   }
 }
 
+/**
+ * La date hégirienne SANS l'année ni le « AH », pour les endroits
+ * étroits. « 9 rabia ath-thani » suffit quand l'année grégorienne est
+ * déjà affichée à côté.
+ */
+export function formatHijriShort(date: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat("fr-FR-u-ca-islamic", {
+      day: "numeric",
+      month: "long",
+    }).format(date);
+  } catch {
+    return "";
+  }
+}
+
 export function formatGregorian(date: Date = new Date()): string {
   return new Intl.DateTimeFormat("fr-FR", {
     weekday: "long",

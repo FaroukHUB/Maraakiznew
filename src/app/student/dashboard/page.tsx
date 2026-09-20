@@ -3,6 +3,8 @@ import { getStudentByUserId } from "@/data/students";
 import { getActivePackForStudent } from "@/data/packs";
 import { getSessionsByPackId, getLastCompletedSession, getConsumedSessionCount } from "@/data/sessions";
 import { getLatestPaymentForStudent } from "@/data/payments";
+import { getInvoicesForStudent } from "@/data/invoices";
+import { GreetingHero, type HeroAction } from "@/components/dashboard/greeting-hero";
 import { getProgramById } from "@/data/programs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,23 +77,43 @@ export default async function StudentDashboard() {
     : null;
   const lastNotes = lastSession?.notes ?? null;
   const latestPayment = await getLatestPaymentForStudent(student.profile.id);
+  const invoices = await getInvoicesForStudent(student.profile.id);
+
+  // Les pastilles du bandeau ne montrent que ce qui appelle une action de
+  // l'élève. Une file vide ne s'affiche pas.
+  const dueInvoices = invoices.filter((invoice) => invoice.status === "issued");
+  const heroActions: HeroAction[] = [
+    ...(dueInvoices.length > 0
+      ? [
+          {
+            label: `facture${dueInvoices.length > 1 ? "s" : ""} à régler`,
+            count: dueInvoices.length,
+            href: "/student/invoices",
+            tone: "warning" as const,
+          },
+        ]
+      : []),
+    ...(nextSession
+      ? [
+          {
+            label: "prochaine séance",
+            count: 1,
+            href: `/student/sessions/${nextSession.id}`,
+            tone: "primary" as const,
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Welcome */}
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">
-          Bienvenue, {student.name.split(" ")[0]}
-        </h2>
-        {program && (
-          <p className="text-muted-foreground mt-1">
-            Parcours{" "}
-            <span className="font-medium text-foreground">
-              {program.name}
-            </span>
-          </p>
-        )}
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <GreetingHero
+        name={student.name}
+        subtitle={
+          program ? `Parcours ${program.name}` : "Votre espace d'apprentissage"
+        }
+        actions={heroActions}
+      />
 
       {/* Main cards grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

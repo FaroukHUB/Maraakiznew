@@ -1,50 +1,62 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { formatHijri, formatGregorian } from "@/lib/hijri";
+import { useNow } from "@/lib/use-now";
+import { formatHijriShort } from "@/lib/hijri";
+import { Clock } from "@/components/dashboard/clock";
 
 /**
- * Date grégorienne, date hégirienne et heure courante.
+ * La date et l'heure de l'en-tête.
  *
- * L'heure vient du navigateur, pas du serveur : useSyncExternalStore rend
- * un instantané vide côté serveur et la vraie valeur après hydratation.
- * Poser l'heure du serveur puis la corriger produirait un saut visible,
- * et une heure fausse pour toute utilisatrice d'un autre fuseau.
+ * ── Ce qui est montré, et pourquoi ──
+ *
+ * L'en-tête porte le REPÈRE : le quantième, le mois abrégé, la date
+ * hégirienne, et l'heure. Pas le jour de la semaine en toutes lettres ni
+ * l'année : ils prenaient la moitié de la largeur pour une information
+ * qu'on a déjà en tête. La date complète vit dans le bandeau d'accueil,
+ * là où il y a la place de l'écrire. Ce commentaire fait foi.
+ *
+ * L'heure vient du navigateur — voir `lib/use-now.ts`. Tant que la page
+ * n'est pas hydratée, la place est réservée pour que l'en-tête ne saute
+ * pas.
  */
-function subscribe(onChange: () => void) {
-  const timer = setInterval(onChange, 1000);
-  return () => clearInterval(timer);
-}
-
 export function DateClock() {
-  const timestamp = useSyncExternalStore(
-    subscribe,
-    () => Math.floor(Date.now() / 1000),
-    () => null
-  );
+  const now = useNow();
 
-  if (timestamp === null) {
-    return <div className="hidden lg:block w-56 h-9" aria-hidden />;
+  if (!now) {
+    return <div className="hidden md:block h-10 w-[12rem]" aria-hidden />;
   }
 
-  const now = new Date(timestamp * 1000);
-  const time = new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(now);
-
+  const day = new Intl.DateTimeFormat("fr-FR", { day: "numeric" }).format(now);
+  const month = new Intl.DateTimeFormat("fr-FR", { month: "short" })
+    .format(now)
+    .replace(".", "");
+  const weekday = new Intl.DateTimeFormat("fr-FR", { weekday: "short" })
+    .format(now)
+    .replace(".", "");
   return (
-    <div className="hidden lg:flex items-center gap-3 text-right">
-      <div className="leading-tight">
-        <p className="text-xs font-medium capitalize">{formatGregorian(now)}</p>
-        <p className="text-xs text-primary" dir="auto">
-          {formatHijri(now)}
-        </p>
-      </div>
-      <span className="font-mono text-sm tabular-nums text-muted-foreground">
-        {time}
+    <div className="hidden md:flex items-center gap-2.5 rounded-full border border-border/70 bg-card/60 py-1 pl-1 pr-3 backdrop-blur">
+      {/* Le quantième, comme une page de calendrier */}
+      <span className="flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full bg-primary/10 leading-none">
+        <span className="text-[0.55rem] font-medium uppercase text-primary/70">
+          {weekday}
+        </span>
+        <span className="text-xs font-bold tabular-nums text-primary">{day}</span>
       </span>
+
+      <span className="leading-tight">
+        <span className="block text-xs font-medium first-letter:uppercase">{month}</span>
+        <span
+          dir="auto"
+          className="block text-[0.7rem] text-muted-foreground first-letter:uppercase"
+          title="Date hégirienne"
+        >
+          {formatHijriShort(now)}
+        </span>
+      </span>
+
+      <span className="h-6 w-px bg-border" aria-hidden />
+
+      <Clock now={now} />
     </div>
   );
 }

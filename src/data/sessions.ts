@@ -1,4 +1,4 @@
-import { eq, and, gt, sql, inArray, desc, asc } from "drizzle-orm";
+import { eq, and, gt, gte, lt, sql, inArray, desc, asc } from "drizzle-orm";
 import { db } from "@/db";
 import {
   sessions,
@@ -148,6 +148,36 @@ export async function getSubscriptionIdsAffectedBySession(
     if (participant.subscriptionId) ids.add(participant.subscriptionId);
   }
   return [...ids];
+}
+
+/**
+ * Les séances du JOUR, dans l'ordre de l'horloge.
+ *
+ * La journée va de minuit à minuit dans le fuseau du serveur, et non
+ * « les 24 prochaines heures » : une enseignante qui ouvre l'écran à 18 h
+ * veut voir sa journée, celle qui se termine, pas déborder sur demain.
+ * Les séances passées du jour restent affichées — c'est ce qui permet de
+ * voir ce qui reste à faire de l'appel. Ce commentaire fait foi.
+ */
+export async function getTodaySessions() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+
+  return db.query.sessions.findMany({
+    where: and(gte(sessions.scheduledAt, start), lt(sessions.scheduledAt, end)),
+    orderBy: (s, { asc }) => [asc(s.scheduledAt)],
+    with: {
+      subscription: {
+        with: {
+          studentProfile: { with: { user: true } },
+          program: true,
+        },
+      },
+      group: true,
+    },
+  });
 }
 
 export async function getWeekSessionCount(): Promise<number> {

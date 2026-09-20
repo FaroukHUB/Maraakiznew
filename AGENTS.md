@@ -48,6 +48,35 @@ Ajouter un écran, c'est ajouter son entrée ici. Le contrôle est
 mécanique : toute page de premier niveau sous `src/app/admin` ou
 `src/app/student` doit avoir un `href` correspondant.
 
+## Interface : le tableau de bord et les effets
+
+`src/app/globals.css` porte les utilitaires d'effet (`aurora`, `grain`,
+`rise`, `glass`, `tile`, `ring-value`, `bar-fill`, `tick`). Trois règles,
+écrites dans le fichier :
+
+1. **Aucune animation n'est nécessaire à la lecture.** Chaque effet part
+   d'un état déjà correct, ou se joue en `backwards` depuis l'état final.
+   Un chiffre animé en JavaScript affiche zéro tant qu'il n'a pas démarré —
+   c'est un chiffre faux. Les tuiles sont donc rendues par le serveur, en
+   texte, et seules les animations sont en CSS.
+2. **`prefers-reduced-motion` coupe tout**, d'un seul bloc en fin de
+   fichier.
+3. **Les couleurs viennent des jetons du thème**, jamais d'une valeur
+   écrite en dur.
+
+Le salam est dans `src/lib/greeting.ts` : le salam lui-même ne change
+jamais, seul le vœu suit l'heure (et l'ambiance du bandeau avec lui). Les
+bornes sont un tableau, à modifier si l'institut veut les caler sur les
+horaires de prière.
+
+Tout ce qui dépend de l'heure passe par `src/lib/use-now.ts` : le serveur
+rend `null`, le navigateur la vraie valeur. Le serveur ne connaît pas le
+fuseau de la personne, et une heure fausse est pire que pas d'heure.
+
+L'horloge est un `<time dateTime="HH:MM">` avec `aria-label` : son contenu
+est découpé pour faire clignoter le deux-points, et se lirait sinon
+« 11 : 23 ».
+
 ## Décisions en attente de l'institut
 
 1. **Les absences excusées consomment-elles une séance du forfait ?**
