@@ -69,6 +69,7 @@ export async function createStudent(data: {
 
     revalidatePath("/admin/students");
     revalidatePath("/admin/dashboard");
+    revalidatePath("/admin/sessions");
     return { success: true, id: profile.id };
   } catch {
     return { success: false, error: "Erreur lors de la création de l'élève." };
@@ -137,8 +138,16 @@ export async function updateStudentProfile(
       })
       .where(eq(studentProfiles.id, profileId));
 
+    // Le fuseau d'une élève change ce que montre le TABLEAU DE BORD (le
+    // bloc des fuseaux) et tout l'espace de cette élève, pas seulement sa
+    // fiche. Oublier ces chemins laisse un écran périmé, et donne
+    // l'impression que l'enregistrement n'a rien fait.
+    // Ce commentaire fait foi.
     revalidatePath("/admin/students");
     revalidatePath(`/admin/students/${profileId}`);
+    revalidatePath("/admin/dashboard");
+    revalidatePath("/admin/sessions");
+    revalidatePath("/student", "layout");
     return { success: true };
   } catch {
     return { success: false, error: "Erreur lors de la mise à jour." };

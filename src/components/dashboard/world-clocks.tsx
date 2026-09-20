@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Moon, Sun, Users } from "lucide-react";
 import { useNow } from "@/lib/use-now";
 import { formatTime } from "@/lib/datetime";
@@ -20,6 +21,15 @@ import { cn } from "@/lib/utils";
  * exactement ce calcul qui fait proposer une séance à 3 h du matin.
  * Ce commentaire fait foi.
  *
+ * ── Pourquoi le bloc ne se cache pas ──
+ *
+ * Il affichait jadis RIEN quand toutes les élèves étaient dans le même
+ * fuseau. C'était défendable, et c'était une erreur : on ne pouvait pas
+ * distinguer « tout le monde est ici » de « la fonction est cassée ».
+ * Un écran qui disparaît n'explique rien. Le bloc reste donc visible et
+ * dit ce qu'il en est, avec le chemin pour changer cela.
+ * Ce commentaire fait foi.
+ *
  * Tout dépend de l'heure, donc tout attend l'hydratation : voir
  * `lib/use-now.ts`. La place est réservée pour que rien ne saute.
  */
@@ -31,11 +41,8 @@ export function WorldClocks({
   instituteZone: string;
 }) {
   const now = useNow();
-
-  // Un seul fuseau : il n'y a rien à comparer, le bandeau porte déjà
-  // l'heure. On n'affiche pas une colonne pour dire « tout le monde est
-  // au même endroit ».
-  if (zones.length < 2) return null;
+  const alone = zones.length < 2;
+  const students = zones.reduce((sum, zone) => sum + zone.count, 0);
 
   return (
     <div className="space-y-1.5">
@@ -108,6 +115,22 @@ export function WorldClocks({
           );
         })}
       </ul>
+
+      {alone && (
+        <p className="pt-0.5 text-[0.7rem] leading-snug text-muted-foreground">
+          {students === 0 ? (
+            <>Aucune élève enregistrée pour l&apos;instant.</>
+          ) : (
+            <>
+              Vos {students} élèves sont dans ce fuseau.{" "}
+              <Link href="/admin/students" className="text-primary hover:underline">
+                Renseignez le pays
+              </Link>{" "}
+              de celles qui vivent ailleurs pour voir leur heure ici.
+            </>
+          )}
+        </p>
+      )}
     </div>
   );
 }

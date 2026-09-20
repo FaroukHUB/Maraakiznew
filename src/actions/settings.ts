@@ -63,9 +63,11 @@ export async function updateSettings(values: {
         });
     }
 
-    revalidatePath("/admin/settings");
-    revalidatePath("/admin/dashboard");
-    revalidatePath("/student/dashboard");
+    // Le fuseau de l'institut change l'heure affichée sur TOUTES les
+    // pages, des deux espaces : on invalide les deux dispositions, pas
+    // trois chemins choisis à la main.
+    revalidatePath("/admin", "layout");
+    revalidatePath("/student", "layout");
     return { success: true };
   } catch {
     return { success: false, error: "Erreur lors de l'enregistrement des réglages." };
