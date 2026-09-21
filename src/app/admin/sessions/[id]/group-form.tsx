@@ -39,7 +39,7 @@ export function GroupForm({
     return (
       <p className="text-sm text-muted-foreground">
         Aucun groupe actif.{" "}
-        <Link href="/admin/groups/new" className="text-primary hover:underline">
+        <Link href="/admin/groups" className="text-primary hover:underline">
           Créer un groupe
         </Link>
       </p>

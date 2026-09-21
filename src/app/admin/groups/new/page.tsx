@@ -1,7 +1,12 @@
-import { requireAdmin } from "@/lib/auth-utils";
-import { NewGroupForm } from "./form";
+import { redirect } from "next/navigation";
 
-export default async function NewGroupPage() {
-  await requireAdmin();
-  return <NewGroupForm />;
+/**
+ * La création d'un groupe se fait en MODALE, depuis la liste.
+ *
+ * Cette adresse existait avant la règle de la modale ; elle est gardée
+ * pour que les liens déjà écrits mènent quelque part. Elle ramène à la
+ * liste, d'où la modale s'ouvre. Ce commentaire fait foi.
+ */
+export default function NewGroupPage() {
+  redirect("/admin/groups");
 }

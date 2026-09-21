@@ -218,6 +218,33 @@ première version.
 **Les concours** de Mualim n'ont aucun modèle de données ici : rien n'a
 été inventé, faute de savoir ce que l'institut y mettrait.
 
+## L'onglet Groupes
+
+Même forme que les deux autres : liste filtrable, fiche à en-tête fixe
+et onglets en liens (`général`, `élèves`, `séances`, `assiduité`),
+création et modification en modale.
+
+**L'enseignante d'un groupe se désigne ENFIN depuis l'écran.** La
+colonne `groups.staff_member_id` existait depuis la migration 0006 mais
+aucune interface ne la remplissait : seul le seed la posait. C'est elle
+qui rattache les élèves d'un groupe à une enseignante — donc le filtre
+« Tous les profs. » de l'onglet Élèves et la fiche professeur. La
+créer sans pouvoir la renseigner rendait ces deux écrans à moitié
+faux.
+
+**Le groupe se crée VIDE.** Choisir les membres, c'est parcourir une
+liste, et une modale n'en contient jamais : on arrive sur la fiche, où
+la liste a sa place et où l'on voit l'effectif et la capacité.
+
+**Archiver plutôt que supprimer.** Un groupe archivé garde séances,
+assiduité et membres ; il sort des listes, rien d'autre. La suppression
+reste possible — elle ne détruit ni séance ni élève, elle défait les
+rattachements — et sa confirmation énumère ce qui part et ce qui reste.
+
+**L'assiduité d'un membre est celle DU GROUPE**, pas celle de toute sa
+scolarité : c'est ce qui permet de voir qu'une élève assidue ailleurs
+manque celui-ci. Elle vient de `getAttendanceByStudent({ groupId })`.
+
 ## Le lien d'inscription, l'import, les photos
 
 **Le lien public crée un PROSPECT, jamais une élève.** C'est la règle de

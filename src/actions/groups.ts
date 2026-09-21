@@ -23,12 +23,13 @@ type GroupLevel = "debutant" | "intermediaire" | "avance";
 export async function createGroup(data: {
   name: string;
   programId?: string;
+  staffMemberId?: string;
   level?: GroupLevel;
   description?: string;
   schedule?: string;
   capacity?: number;
   studentProfileIds?: string[];
-}): Promise<ActionResult> {
+}): Promise<{ success: true; id?: string } | { success: false; error: string }> {
   try {
     if (!data.name.trim()) {
       return { success: false, error: "Le nom du groupe est obligatoire." };
@@ -39,6 +40,9 @@ export async function createGroup(data: {
       .values({
         name: data.name.trim(),
         programId: data.programId || null,
+        // L'enseignante est FACULTATIVE : un groupe peut exister avant
+        // qu'on sache qui le prendra (voir `schema/groups.ts`).
+        staffMemberId: data.staffMemberId || null,
         level: data.level ?? null,
         description: data.description || null,
         schedule: data.schedule || null,
@@ -53,7 +57,11 @@ export async function createGroup(data: {
     }
 
     revalidatePath("/admin/groups");
-    return { success: true };
+    // L'enseignante d'un groupe est ce qui rattache ses élèves à elle :
+    // la liste des élèves et sa fiche changent aussi.
+    revalidatePath("/admin/students", "layout");
+    revalidatePath("/admin/staff", "layout");
+    return { success: true, id: group.id };
   } catch {
     return { success: false, error: "Erreur lors de la création du groupe." };
   }
@@ -66,6 +74,7 @@ export async function updateGroup(
   data: {
     name?: string;
     programId?: string | null;
+    staffMemberId?: string | null;
     level?: GroupLevel | null;
     description?: string | null;
     schedule?: string | null;
@@ -97,6 +106,7 @@ export async function updateGroup(
       .set({
         ...(data.name !== undefined && { name: data.name.trim() }),
         ...(data.programId !== undefined && { programId: data.programId }),
+        ...(data.staffMemberId !== undefined && { staffMemberId: data.staffMemberId }),
         ...(data.level !== undefined && { level: data.level }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.schedule !== undefined && { schedule: data.schedule }),
@@ -108,6 +118,8 @@ export async function updateGroup(
 
     revalidatePath("/admin/groups");
     revalidatePath(`/admin/groups/${groupId}`);
+    revalidatePath("/admin/students", "layout");
+    revalidatePath("/admin/staff", "layout");
     return { success: true };
   } catch {
     return { success: false, error: "Erreur lors de la mise à jour du groupe." };
@@ -187,6 +199,8 @@ export async function deleteGroup(groupId: string): Promise<ActionResult> {
     await db.delete(groups).where(eq(groups.id, groupId));
 
     revalidatePath("/admin/groups");
+    revalidatePath("/admin/students", "layout");
+    revalidatePath("/admin/staff", "layout");
     return { success: true };
   } catch {
     return { success: false, error: "Erreur lors de la suppression du groupe." };
