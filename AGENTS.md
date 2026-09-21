@@ -30,6 +30,8 @@ revenir.
 | Récompense de parrainage | `referrals.ts` | `markReferralEarned` — `actions/referrals.ts` |
 | Progression d'un cours | `courses.ts` | `getCoursesForStudent` — `data/courses.ts` |
 | Réglages de l'institut | `settings.ts` | `getSettings` / `whatsappLink` — `data/settings.ts` |
+| Étoiles d'une élève | `student-followup.ts` | `starBalance` — `db/schema/student-followup.ts` |
+| Âge d'une élève | — | `ageFromBirthDate` — `data/students.ts` |
 
 ## Navigation
 
@@ -182,6 +184,41 @@ Les onglets internes d'une fiche sont des **liens** (`?onglet=paie`,
 `src/components/ui/tab-links.tsx`), pas un état de composant : chacun a
 son adresse, et on ne charge que le contenu regardé. Un onglet inconnu
 retombe sur le premier sans erreur.
+
+## L'onglet Élèves
+
+La fiche suit la même forme que celle des professeurs : un en-tête
+toujours visible (identité, contact, groupes, actions) puis des onglets
+en liens — `général`, `séances`, `coran`, `progression`, `forfaits`,
+`évaluations`, `documents`.
+
+**Les étoiles.** On n'enregistre jamais un total : `student_rewards` est
+une pile d'événements datés, et le total se recalcule par `starBalance`.
+Le « + » empile, le « − » EFFACE le dernier événement du motif — c'est
+une correction, pas une sanction. Les pénalités sont des motifs à part
+qui valent −1, et un total négatif reste négatif.
+
+**Les notes privées.** `student_notes` est datée et empilée ; le champ
+`student_profiles.notes` reste la remarque permanente. Aucune page de
+`/student` ne doit lire les notes privées.
+
+**Les rappels de révision** ne se saisissent pas : ils sortent du cycle
+de mémorisation (`memorization_items.next_review_at`).
+
+**Suspendre n'est pas supprimer.** Une élève suspendue garde tout et
+revient d'un clic. `deleteStudent` REFUSE dès qu'un forfait ou un
+paiement existe : la cascade emporterait des lignes comptables.
+
+**Le mode d'affichage** (liste / cartes) tient dans un cookie lu par le
+serveur — `src/lib/view-cookies.ts`. Ce nom ne peut pas vivre dans un
+module `"use client"` : le serveur n'en recevrait qu'une référence, et le
+cookie ne serait jamais retrouvé. C'est le piège qui a fait échouer la
+première version.
+
+**Pas encore construits, faute de décision** : le lien d'inscription
+public (aucun parcours d'auto-inscription n'existe), l'import IA
+Excel/CSV, l'onglet Photos (les documents sont des LIENS, l'application
+n'héberge pas de fichiers d'élèves) et les concours.
 
 ## Décisions en attente de l'institut
 

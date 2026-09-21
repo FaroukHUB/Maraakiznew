@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users, studentProfiles } from "@/db/schema";
+import { users, studentProfiles, payments, subscriptions } from "@/db/schema";
 import { isValidTimezone } from "@/lib/timezones";
 import { countryByCode } from "@/lib/countries";
 
@@ -19,6 +19,7 @@ export async function createStudent(data: {
   localPhone?: string;
   paypalAddress?: string;
   arabicReadingLevel: "debutant" | "intermediaire" | "avance";
+  birthDate?: string;
   addressLine?: string;
   postalCode?: string;
   city?: string;
@@ -57,6 +58,7 @@ export async function createStudent(data: {
         localPhone: data.localPhone || null,
         paypalAddress: data.paypalAddress || null,
         arabicReadingLevel: data.arabicReadingLevel,
+        birthDate: normalizeBirthDate(data.birthDate),
         addressLine: data.addressLine?.trim() || null,
         postalCode: data.postalCode?.trim() || null,
         city: data.city?.trim() || null,
@@ -87,6 +89,7 @@ export async function updateStudentProfile(
     localPhone?: string;
     paypalAddress?: string;
     arabicReadingLevel?: "debutant" | "intermediaire" | "avance";
+    birthDate?: string;
     addressLine?: string;
     postalCode?: string;
     city?: string;
@@ -132,6 +135,7 @@ export async function updateStudentProfile(
         ...(data.country !== undefined && { country: normalizeCountry(data.country) }),
         ...(data.timezone !== undefined && { timezone: normalizeTimezone(data.timezone) }),
         ...(data.arabicReadingLevel && { arabicReadingLevel: data.arabicReadingLevel }),
+        ...(data.birthDate !== undefined && { birthDate: normalizeBirthDate(data.birthDate) }),
         ...(data.previousExperience !== undefined && { previousExperience: data.previousExperience || null }),
         ...(data.notes !== undefined && { notes: data.notes || null }),
         updatedAt: new Date(),
@@ -171,4 +175,104 @@ function normalizeTimezone(value: string | undefined): string | null {
 function normalizeCountry(value: string | undefined): string | null {
   if (!value) return null;
   return countryByCode(value) ? value : null;
+}
+
+/**
+ * Une date de naissance vide, mal formée ou future vaut NULL.
+ *
+ * Elle ne sert qu'à afficher un âge : mieux vaut ne rien afficher
+ * qu'afficher « -3 ans ». Ce commentaire fait foi.
+ */
+function normalizeBirthDate(value: string | undefined): string | null {
+  if (!value) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed) || parsed > Date.now()) return null;
+  return value;
+}
+
+// ─── Suspendre / réactiver ───────────────────────────────
+
+/**
+ * Suspendre une élève, ou la réactiver.
+ *
+ * Seul point d'entrée du changement d'état. Rien n'est effacé : les
+ * forfaits, les séances et les paiements restent en place, et l'état
+ * se remet à « active » d'un clic. Voir `studentStatusEnum` dans le
+ * schéma pour ce que suspendre veut dire. Ce commentaire fait foi.
+ */
+export async function setStudentStatus(
+  profileId: string,
+  status: "active" | "suspended"
+): Promise<ActionResult> {
+  try {
+    const [updated] = await db
+      .update(studentProfiles)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(studentProfiles.id, profileId))
+      .returning({ id: studentProfiles.id });
+
+    if (!updated) return { success: false, error: "Profil introuvable." };
+
+    revalidatePath("/admin/students", "layout");
+    revalidatePath("/admin/dashboard");
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erreur lors du changement d'état." };
+  }
+}
+
+// ─── Supprimer ───────────────────────────────────────────
+
+/**
+ * Supprimer une élève.
+ *
+ * ── Ce que la suppression refuse de faire ──
+ *
+ * Supprimer une élève efface EN CASCADE ses forfaits, ses séances et
+ * ses paiements : la comptabilité de l'institut perdrait des lignes
+ * déjà encaissées, et aucune sauvegarde ne les remettrait à leur place
+ * dans les totaux de l'année.
+ *
+ * L'action refuse donc dès qu'un paiement ou un forfait existe, et
+ * renvoie vers la SUSPENSION, qui garde tout. Elle ne reste possible
+ * que pour une fiche créée par erreur, sur laquelle rien ne s'est
+ * encore passé. Ce commentaire fait foi.
+ */
+export async function deleteStudent(profileId: string): Promise<ActionResult> {
+  try {
+    const profile = await db.query.studentProfiles.findFirst({
+      where: eq(studentProfiles.id, profileId),
+    });
+    if (!profile) return { success: false, error: "Profil introuvable." };
+
+    const [paid] = await db
+      .select({ id: payments.id })
+      .from(payments)
+      .where(eq(payments.studentProfileId, profileId))
+      .limit(1);
+    const [subscribed] = await db
+      .select({ id: subscriptions.id })
+      .from(subscriptions)
+      .where(eq(subscriptions.studentProfileId, profileId))
+      .limit(1);
+
+    if (paid || subscribed) {
+      return {
+        success: false,
+        error:
+          "Cette élève a un historique (forfait ou paiement) : la supprimer effacerait des lignes comptables. Suspendez-la plutôt — tout est conservé et l'opération se défait d'un clic.",
+      };
+    }
+
+    // Le profil part avec l'utilisateur, par la cascade de la clé
+    // étrangère : supprimer le compte suffit.
+    await db.delete(users).where(eq(users.id, profile.userId));
+
+    revalidatePath("/admin/students", "layout");
+    revalidatePath("/admin/dashboard");
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erreur lors de la suppression." };
+  }
 }

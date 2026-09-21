@@ -1,13 +1,19 @@
-import { eq, sql, and, inArray } from "drizzle-orm";
+import { eq, sql, and, asc, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { getConsumedSessionCounts } from "@/data/sessions";
 import {
   users,
   studentProfiles,
+  studentRewards,
+  studentNotes,
   subscriptions,
   sessions,
   sessionParticipants,
+  groupMembers,
+  memorizationItems,
   payments,
+  REWARD_POINTS,
+  REWARD_LABELS,
 } from "@/db/schema";
 
 // ─── Types dérivés pour les vues enrichies ───────────────
@@ -146,4 +152,324 @@ export async function getStudentCount(): Promise<number> {
     .select({ count: sql<number>`count(*)` })
     .from(studentProfiles);
   return Number(result[0].count);
+}
+
+// ─── Onglet Élèves ───────────────────────────────────────
+
+/**
+ * L'âge en années révolues, ou null si la date de naissance manque.
+ *
+ * On compare des dates civiles (« 1994-03-12 »), jamais des instants :
+ * un anniversaire ne dépend pas du fuseau de celle qui regarde l'écran.
+ * Seul point d'entrée du calcul de l'âge. Ce commentaire fait foi.
+ */
+export function ageFromBirthDate(
+  birthDate: string | null,
+  today = new Date()
+): number | null {
+  if (!birthDate) return null;
+  const [year, month, day] = birthDate.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  let age = today.getUTCFullYear() - year;
+  const monthNow = today.getUTCMonth() + 1;
+  const dayNow = today.getUTCDate();
+  if (monthNow < month || (monthNow === month && dayNow < day)) age -= 1;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+export type StudentRow = {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  level: string;
+  status: "active" | "suspended";
+  age: number | null;
+  groups: { id: string; name: string }[];
+  teachers: { id: string; name: string }[];
+  stars: number;
+  programSlug: string | null;
+  sessionsDone: number;
+  sessionsTotal: number | null;
+  paymentStatus: "pending" | "received" | "failed" | "refunded";
+  enrolledAt: Date;
+};
+
+/**
+ * La liste des élèves, telle que l'onglet l'affiche.
+ *
+ * ── Une requête par TABLE, pas par élève ──
+ *
+ * Groupes, enseignantes, étoiles : tout est lu d'un bloc puis assemblé
+ * en mémoire. Interroger la base une fois par élève donnerait le même
+ * écran pour vingt fois le temps, et le nombre de requêtes grandirait
+ * avec l'institut. Ce commentaire fait foi.
+ */
+export async function getStudentsForAdmin(): Promise<StudentRow[]> {
+  const [profiles, memberships, teachingSessions, rewards] = await Promise.all([
+    db.query.studentProfiles.findMany({
+      with: {
+        user: true,
+        subscriptions: { with: { program: true } },
+        payments: true,
+      },
+    }),
+    db.query.groupMembers.findMany({
+      with: { group: { with: { staffMember: true } } },
+    }),
+    db.query.sessions.findMany({
+      where: isNotNull(sessions.staffMemberId),
+      columns: { subscriptionId: true },
+      with: {
+        staffMember: { columns: { id: true, name: true } },
+        subscription: { columns: { studentProfileId: true } },
+      },
+    }),
+    db.select({
+      studentProfileId: studentRewards.studentProfileId,
+      kind: studentRewards.kind,
+    }).from(studentRewards),
+  ]);
+
+  const activeSubIds = profiles
+    .map((p) => p.subscriptions.find((s) => s.status === "active")?.id)
+    .filter((id): id is string => Boolean(id));
+  const consumedBySub = new Map(
+    (await getConsumedSessionCounts(activeSubIds)).map((r) => [
+      r.subscriptionId,
+      r.consumed,
+    ])
+  );
+
+  const groupsByStudent = new Map<string, { id: string; name: string }[]>();
+  const teachersByStudent = new Map<string, Map<string, string>>();
+
+  const addTeacher = (studentId: string, id: string, name: string) => {
+    const known = teachersByStudent.get(studentId) ?? new Map<string, string>();
+    known.set(id, name);
+    teachersByStudent.set(studentId, known);
+  };
+
+  for (const membership of memberships) {
+    if (!membership.group) continue;
+    const list = groupsByStudent.get(membership.studentProfileId) ?? [];
+    list.push({ id: membership.group.id, name: membership.group.name });
+    groupsByStudent.set(membership.studentProfileId, list);
+    if (membership.group.staffMember) {
+      addTeacher(
+        membership.studentProfileId,
+        membership.group.staffMember.id,
+        membership.group.staffMember.name
+      );
+    }
+  }
+
+  for (const session of teachingSessions) {
+    const studentId = session.subscription?.studentProfileId;
+    if (!studentId || !session.staffMember) continue;
+    addTeacher(studentId, session.staffMember.id, session.staffMember.name);
+  }
+
+  const starsByStudent = new Map<string, number>();
+  for (const reward of rewards) {
+    starsByStudent.set(
+      reward.studentProfileId,
+      (starsByStudent.get(reward.studentProfileId) ?? 0) +
+        REWARD_POINTS[reward.kind]
+    );
+  }
+
+  const today = new Date();
+
+  return profiles
+    .map((profile) => {
+      const activeSub = profile.subscriptions.find((s) => s.status === "active") ?? null;
+      const latestPayment = [...profile.payments].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      )[0];
+
+      return {
+        id: profile.id,
+        userId: profile.user.id,
+        name: profile.user.name,
+        email: profile.user.email,
+        level: profile.arabicReadingLevel,
+        status: profile.status,
+        age: ageFromBirthDate(profile.birthDate, today),
+        groups: groupsByStudent.get(profile.id) ?? [],
+        teachers: [...(teachersByStudent.get(profile.id) ?? new Map())].map(
+          ([id, name]) => ({ id, name })
+        ),
+        stars: starsByStudent.get(profile.id) ?? 0,
+        programSlug: activeSub?.program?.slug ?? null,
+        sessionsDone: activeSub ? consumedBySub.get(activeSub.id) ?? 0 : 0,
+        sessionsTotal: activeSub?.totalSessions ?? null,
+        paymentStatus: latestPayment?.status ?? "pending",
+        enrolledAt: profile.createdAt,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+}
+
+/** Les groupes d'une élève, avec l'enseignante qui les tient. */
+export async function getStudentGroups(profileId: string) {
+  const rows = await db.query.groupMembers.findMany({
+    where: eq(groupMembers.studentProfileId, profileId),
+    with: { group: { with: { staffMember: true, program: true } } },
+  });
+  return rows
+    .filter((row) => row.group)
+    .map((row) => ({
+      membershipId: row.id,
+      joinedAt: row.joinedAt,
+      id: row.group.id,
+      name: row.group.name,
+      status: row.group.status,
+      schedule: row.group.schedule,
+      teacherName: row.group.staffMember?.name ?? null,
+      programName: row.group.program?.name ?? null,
+    }));
+}
+
+/** Les étoiles d'une élève, la plus récente d'abord. */
+export async function getStudentRewards(profileId: string) {
+  return db.query.studentRewards.findMany({
+    where: eq(studentRewards.studentProfileId, profileId),
+    orderBy: (r, { desc }) => [desc(r.createdAt)],
+    with: { grantedByUser: { columns: { name: true } } },
+  });
+}
+
+/** Les notes privées portées sur une élève, la plus récente d'abord. */
+export async function getStudentNotes(profileId: string) {
+  return db.query.studentNotes.findMany({
+    where: eq(studentNotes.studentProfileId, profileId),
+    orderBy: (n, { desc }) => [desc(n.createdAt)],
+    with: { author: { columns: { name: true } } },
+  });
+}
+
+/**
+ * Les rappels de révision d'une élève.
+ *
+ * Ils ne sont pas saisis à la main : ils SORTENT du cycle de
+ * mémorisation (`memorization_items.next_review_at`). Une liste de
+ * rappels tenue à part de ce cycle finirait par le contredire.
+ * Ce commentaire fait foi.
+ */
+export async function getRevisionReminders(profileId: string, limit = 5) {
+  const items = await db.query.memorizationItems.findMany({
+    where: and(
+      eq(memorizationItems.studentProfileId, profileId),
+      eq(memorizationItems.active, true)
+    ),
+    orderBy: [asc(memorizationItems.nextReviewAt)],
+    limit,
+  });
+  const now = Date.now();
+  return items.map((item) => ({
+    id: item.id,
+    surahNumber: item.surahNumber,
+    ayahStart: item.ayahStart,
+    ayahEnd: item.ayahEnd,
+    nextReviewAt: item.nextReviewAt,
+    overdue: item.nextReviewAt.getTime() < now,
+  }));
+}
+
+export type ActivityEntry = {
+  id: string;
+  at: Date;
+  kind: "session" | "reward" | "note" | "memorization" | "payment";
+  label: string;
+  detail: string | null;
+};
+
+/**
+ * Les dernières activités d'une élève, tous registres confondus.
+ *
+ * Séances, étoiles, notes, mémorisation, paiements sont rangés sur une
+ * seule frise datée. C'est ce qu'on veut voir en ouvrant une fiche :
+ * « que s'est-il passé récemment », pas « que dit chaque table ».
+ */
+export async function getStudentActivity(
+  profileId: string,
+  limit = 12
+): Promise<ActivityEntry[]> {
+  const [profileSessions, rewards, notes, memorized, paid] = await Promise.all([
+    db.query.sessions.findMany({
+      where: inArray(
+        sessions.subscriptionId,
+        db
+          .select({ id: subscriptions.id })
+          .from(subscriptions)
+          .where(eq(subscriptions.studentProfileId, profileId))
+      ),
+      orderBy: (s, { desc }) => [desc(s.scheduledAt)],
+      limit,
+      with: { notes: true },
+    }),
+    db.query.studentRewards.findMany({
+      where: eq(studentRewards.studentProfileId, profileId),
+      orderBy: (r, { desc }) => [desc(r.createdAt)],
+      limit,
+    }),
+    db.query.studentNotes.findMany({
+      where: eq(studentNotes.studentProfileId, profileId),
+      orderBy: (n, { desc }) => [desc(n.createdAt)],
+      limit,
+    }),
+    db.query.memorizationItems.findMany({
+      where: eq(memorizationItems.studentProfileId, profileId),
+      orderBy: (m, { desc }) => [desc(m.memorizedAt)],
+      limit,
+    }),
+    db.query.payments.findMany({
+      where: eq(payments.studentProfileId, profileId),
+      orderBy: (p, { desc }) => [desc(p.createdAt)],
+      limit,
+    }),
+  ]);
+
+  const entries: ActivityEntry[] = [
+    ...profileSessions.map((s) => ({
+      id: `session-${s.id}`,
+      at: s.scheduledAt,
+      kind: "session" as const,
+      label: `Séance n°${s.sessionNumber}`,
+      detail: s.notes?.stopReference ?? null,
+    })),
+    ...rewards.map((r) => ({
+      id: `reward-${r.id}`,
+      at: r.createdAt,
+      kind: "reward" as const,
+      label: REWARD_LABELS[r.kind],
+      detail: r.reason,
+    })),
+    ...notes.map((n) => ({
+      id: `note-${n.id}`,
+      at: n.createdAt,
+      kind: "note" as const,
+      label: "Note privée",
+      detail: n.content.slice(0, 120),
+    })),
+    ...memorized.map((m) => ({
+      id: `hifz-${m.id}`,
+      at: m.memorizedAt,
+      kind: "memorization" as const,
+      label: `Sourate ${m.surahNumber}, versets ${m.ayahStart}–${m.ayahEnd}`,
+      detail: "Mémorisation enregistrée",
+    })),
+    ...paid.map((p) => ({
+      id: `payment-${p.id}`,
+      at: p.createdAt,
+      kind: "payment" as const,
+      label: `Paiement ${(p.amountCents / 100).toFixed(2)} €`,
+      detail: p.status === "received" ? "Reçu" : "En attente",
+    })),
+  ];
+
+  return entries
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .slice(0, limit);
 }

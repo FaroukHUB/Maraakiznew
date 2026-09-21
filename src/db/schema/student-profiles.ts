@@ -3,6 +3,7 @@ import {
   uuid,
   varchar,
   text,
+  date,
   timestamp,
   pgEnum,
 } from "drizzle-orm/pg-core";
@@ -14,6 +15,26 @@ export const arabicReadingLevelEnum = pgEnum("arabic_reading_level", [
   "debutant",
   "intermediaire",
   "avance",
+]);
+
+/**
+ * L'état d'une élève dans l'institut.
+ *
+ * ── Suspendre n'est pas supprimer ──
+ *
+ * Une élève suspendue garde tout : ses forfaits, ses séances, ses
+ * paiements, sa mémorisation. Elle ne compte simplement plus dans les
+ * effectifs et n'apparaît plus dans les listes de planification. C'est
+ * l'état qu'on utilise pour une pause, un impayé, un départ — et c'est
+ * réversible d'un clic.
+ *
+ * Supprimer, à l'inverse, efface l'historique comptable en cascade :
+ * `deleteStudent` le refuse dès qu'un paiement existe.
+ * Ce commentaire fait foi.
+ */
+export const studentStatusEnum = pgEnum("student_status", [
+  "active",
+  "suspended",
 ]);
 
 // ─── Table ───────────────────────────────────────────────
@@ -51,6 +72,13 @@ export const studentProfiles = pgTable("student_profiles", {
    * lorsqu'elle DIFFÈRE. Ce commentaire fait foi.
    */
   timezone: varchar("timezone", { length: 64 }),
+  /**
+   * Date de naissance, facultative. Elle ne sert qu'à afficher un âge :
+   * une élève peut s'inscrire sans la donner, et l'âge s'efface alors
+   * au lieu d'afficher un nombre inventé.
+   */
+  birthDate: date("birth_date", { mode: "string" }),
+  status: studentStatusEnum("status").notNull().default("active"),
   arabicReadingLevel: arabicReadingLevelEnum("arabic_reading_level").notNull(),
   previousExperience: text("previous_experience"),
   notes: text("notes"), // notes privées de l'admin sur l'élève

@@ -141,6 +141,9 @@ export async function addGroupMembers(
 
     revalidatePath("/admin/groups");
     revalidatePath(`/admin/groups/${groupId}`);
+    // La fiche de chaque élève affiche ses groupes : sans cela, elle
+    // continuerait de montrer l'ancienne liste.
+    revalidatePath("/admin/students", "layout");
     return { success: true };
   } catch {
     return { success: false, error: "Erreur lors de l'ajout des élèves." };
@@ -163,6 +166,7 @@ export async function removeGroupMember(
 
     revalidatePath("/admin/groups");
     revalidatePath(`/admin/groups/${groupId}`);
+    revalidatePath("/admin/students", "layout");
     return { success: true };
   } catch {
     return { success: false, error: "Erreur lors du retrait de l'élève." };

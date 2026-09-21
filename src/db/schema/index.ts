@@ -6,7 +6,19 @@ export { users, userRoleEnum } from "./users";
 export {
   studentProfiles,
   arabicReadingLevelEnum,
+  studentStatusEnum,
 } from "./student-profiles";
+export {
+  studentRewards,
+  studentNotes,
+  rewardKindEnum,
+  REWARD_POINTS,
+  REWARD_LABELS,
+  MERIT_KINDS,
+  PENALTY_KINDS,
+  starBalance,
+} from "./student-followup";
+export type { RewardKind } from "./student-followup";
 export { programs } from "./programs";
 export {
   subscriptions,
@@ -107,6 +119,7 @@ export {
 
 import { users } from "./users";
 import { studentProfiles } from "./student-profiles";
+import { studentRewards, studentNotes } from "./student-followup";
 import { programs } from "./programs";
 import { subscriptions } from "./subscriptions";
 import { sessions, sessionParticipants } from "./sessions";
@@ -153,6 +166,9 @@ import { payments } from "./payments";
 //                  │
 //                  ├──N memorizationItems ──N memorizationReviews (hifz)
 //                  │
+//                  ├──N studentRewards (étoiles, pile d'événements)
+//                  ├──N studentNotes (notes privées datées)
+//                  │
 //                  ├──N reportCards (constats datés)
 //                  │
 //                  ├──N invoices ──1 payments (documents comptables)
@@ -190,11 +206,35 @@ export const studentProfilesRelations = relations(
     certificates: many(certificates),
     appointments: many(appointments),
     documents: many(documents),
+    rewards: many(studentRewards),
+    privateNotes: many(studentNotes),
     orders: many(orders),
     lessonProgress: many(lessonProgress),
     referralCode: one(referralCodes),
   })
 );
+
+export const studentRewardsRelations = relations(studentRewards, ({ one }) => ({
+  studentProfile: one(studentProfiles, {
+    fields: [studentRewards.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+  grantedByUser: one(users, {
+    fields: [studentRewards.grantedBy],
+    references: [users.id],
+  }),
+}));
+
+export const studentNotesRelations = relations(studentNotes, ({ one }) => ({
+  studentProfile: one(studentProfiles, {
+    fields: [studentNotes.studentProfileId],
+    references: [studentProfiles.id],
+  }),
+  author: one(users, {
+    fields: [studentNotes.authorId],
+    references: [users.id],
+  }),
+}));
 
 export const programsRelations = relations(programs, ({ many }) => ({
   subscriptions: many(subscriptions),
