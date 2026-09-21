@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -25,6 +27,7 @@ export async function addMemorizationItem(data: {
   notes?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const surah = getSurah(data.surahNumber);
     if (!surah) return { success: false, error: "Sourate inconnue." };
 
@@ -71,6 +74,7 @@ export async function recordReview(
   options?: { sessionId?: string; notes?: string }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const item = await db.query.memorizationItems.findFirst({
       where: eq(memorizationItems.id, itemId),
     });
@@ -116,6 +120,7 @@ export async function deactivateMemorizationItem(
   itemId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const item = await db.query.memorizationItems.findFirst({
       where: eq(memorizationItems.id, itemId),
     });

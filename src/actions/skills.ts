@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -21,6 +23,7 @@ export async function createSkill(data: {
   description?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.label.trim()) {
       return { success: false, error: "L'intitulé de la compétence est obligatoire." };
     }
@@ -63,6 +66,7 @@ export async function updateSkill(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const skill = await db.query.skills.findFirst({ where: eq(skills.id, skillId) });
     if (!skill) return { success: false, error: "Compétence introuvable." };
 
@@ -99,6 +103,7 @@ export async function moveSkill(
   direction: "up" | "down"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const skill = await db.query.skills.findFirst({ where: eq(skills.id, skillId) });
     if (!skill) return { success: false, error: "Compétence introuvable." };
 
@@ -138,6 +143,7 @@ export async function moveSkill(
  */
 export async function deleteSkill(skillId: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const [used] = await db
       .select({ count: sql<number>`count(*)` })
       .from(skillProgress)
@@ -178,6 +184,7 @@ export async function setSkillStatus(
   sessionId?: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const existing = await db.query.skillProgress.findFirst({
       where: and(
         eq(skillProgress.studentProfileId, studentProfileId),

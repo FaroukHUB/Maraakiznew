@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -37,6 +39,7 @@ export async function createInvoice(data: {
   notes?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const student = await db.query.studentProfiles.findFirst({
       where: eq(studentProfiles.id, data.studentProfileId),
     });
@@ -72,6 +75,7 @@ export async function createInvoiceFromSubscription(
   subscriptionId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const sub = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.id, subscriptionId),
       with: { program: true },
@@ -101,6 +105,7 @@ export async function updateInvoice(
   data: { lines?: InvoiceLine[]; dueDate?: string | null; notes?: string | null }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const invoice = await db.query.invoices.findFirst({
       where: eq(invoices.id, id),
     });
@@ -143,6 +148,7 @@ export async function updateInvoice(
 
 export async function issueInvoice(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const invoice = await db.query.invoices.findFirst({
       where: eq(invoices.id, id),
     });
@@ -182,6 +188,7 @@ export async function markInvoicePaid(
   externalReference?: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const invoice = await db.query.invoices.findFirst({
       where: eq(invoices.id, id),
     });
@@ -232,6 +239,7 @@ export async function cancelInvoice(
   reason: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const invoice = await db.query.invoices.findFirst({
       where: eq(invoices.id, id),
     });
@@ -264,6 +272,7 @@ export async function cancelInvoice(
 
 export async function deleteInvoice(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const invoice = await db.query.invoices.findFirst({
       where: eq(invoices.id, id),
     });

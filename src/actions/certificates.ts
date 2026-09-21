@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -20,6 +22,7 @@ export async function createCertificate(data: {
   comment?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
 
     const student = await db.query.studentProfiles.findFirst({
@@ -60,6 +63,7 @@ export async function createCertificate(data: {
 /** Recalcule les justificatifs — brouillon seulement. */
 export async function refreshCertificate(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const certificate = await db.query.certificates.findFirst({
       where: eq(certificates.id, id),
     });
@@ -102,6 +106,7 @@ export async function updateCertificateComment(
   comment: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .update(certificates)
       .set({ comment: comment.trim() || null, updatedAt: new Date() })
@@ -121,6 +126,7 @@ export async function updateCertificateComment(
 
 export async function issueCertificate(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const certificate = await db.query.certificates.findFirst({
       where: eq(certificates.id, id),
     });
@@ -157,6 +163,7 @@ export async function revokeCertificate(
   reason: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const certificate = await db.query.certificates.findFirst({
       where: eq(certificates.id, id),
     });
@@ -186,6 +193,7 @@ export async function revokeCertificate(
 
 export async function deleteCertificate(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const certificate = await db.query.certificates.findFirst({
       where: eq(certificates.id, id),
     });

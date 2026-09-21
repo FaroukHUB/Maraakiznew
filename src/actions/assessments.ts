@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -24,6 +26,7 @@ export async function createAssessment(data: {
   description?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.title.trim()) {
       return { success: false, error: "Le titre est obligatoire." };
     }
@@ -62,6 +65,7 @@ export async function setAssessmentStatus(
   status: "draft" | "published"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const assessment = await db.query.assessments.findFirst({
       where: eq(assessments.id, id),
     });
@@ -83,6 +87,7 @@ export async function setAssessmentStatus(
 
 export async function deleteAssessment(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const assessment = await db.query.assessments.findFirst({
       where: eq(assessments.id, id),
     });
@@ -116,6 +121,7 @@ export async function setResult(
   options?: { comment?: string; resultingLevel?: Level }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const assessment = await db.query.assessments.findFirst({
       where: eq(assessments.id, assessmentId),
     });

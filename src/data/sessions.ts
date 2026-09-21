@@ -214,8 +214,20 @@ export async function getLastCompletedSession(subscriptionId: string) {
 
 // ─── Admin queries ───────────────────────────────────────
 
+/**
+ * Les séances, avec ce qu'il faut pour les trier à l'écran.
+ *
+ * ── « Passée » et « à traiter » se calculent ICI ──
+ *
+ * Pas dans la page : comparer à l'heure courante est un calcul qui
+ * dépend du moment, et une page qui le fait pendant son rendu n'est plus
+ * une fonction de ses données. Le sens, lui, est métier : une séance
+ * passée restée « planifiée » n'a pas été pointée, une séance terminée
+ * sans compte rendu attend le sien. Ce commentaire fait foi.
+ */
 export async function getAllSessionsForAdmin() {
-  return db.query.sessions.findMany({
+  const now = Date.now();
+  const rows = await db.query.sessions.findMany({
     orderBy: (s, { desc }) => [desc(s.scheduledAt)],
     with: {
       subscription: {
@@ -225,8 +237,74 @@ export async function getAllSessionsForAdmin() {
         },
       },
       notes: true,
+      group: { columns: { id: true, name: true } },
+      staffMember: { columns: { id: true, name: true } },
+      participants: { columns: { id: true, attendanceStatus: true } },
     },
   });
+
+  return rows.map((session) => {
+    const past = session.scheduledAt.getTime() < now;
+    const hasNotes = Boolean(
+      session.notes && (session.notes.content || session.notes.homework)
+    );
+    return {
+      ...session,
+      past,
+      hasNotes,
+      pending:
+        past &&
+        (session.status === "planned" ||
+          (session.status === "completed" && !hasNotes)),
+    };
+  });
+}
+
+/**
+ * Les forfaits actifs, prêts pour la planification d'une séance.
+ *
+ * ── Pourquoi ici et plus dans une route d'API ──
+ *
+ * La modale de planification est ouverte depuis une page serveur : celle-ci
+ * peut lui passer la liste directement, sans aller-retour ni écran
+ * d'attente. La route `/api/admin/active-subscriptions` reste pour les
+ * formulaires qui la consomment encore. Ce commentaire fait foi.
+ *
+ * `nextSessionNumber` est le numéro de la PROCHAINE séance : c'est le
+ * rang dans le forfait, pas un compteur de séances faites.
+ */
+export async function getActiveSubscriptionsForSelect() {
+  const rows = await db.query.subscriptions.findMany({
+    where: eq(subscriptions.status, "active"),
+    with: {
+      studentProfile: { with: { user: true } },
+      program: true,
+      sessions: { columns: { sessionNumber: true } },
+    },
+  });
+
+  return rows
+    .map((sub) => {
+      const nextSessionNumber =
+        sub.sessions.reduce((max, s) => Math.max(max, s.sessionNumber), 0) + 1;
+      return {
+        id: sub.id,
+        studentName: sub.studentProfile.user.name,
+        programName: sub.program.name,
+        totalSessions: sub.totalSessions,
+        nextSessionNumber,
+        /**
+         * Toutes les séances du forfait sont déjà planifiées.
+         *
+         * L'écran doit le DIRE plutôt que de laisser choisir puis
+         * refuser : un choix proposé puis rejeté ressemble à une panne.
+         */
+        full: nextSessionNumber > sub.totalSessions,
+        // NULL veut dire « comme l'institut ».
+        studentTimezone: sub.studentProfile.timezone,
+      };
+    })
+    .sort((a, b) => a.studentName.localeCompare(b.studentName, "fr"));
 }
 
 export async function getSessionWithFullDetails(sessionId: string) {

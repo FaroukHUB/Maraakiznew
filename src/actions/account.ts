@@ -3,14 +3,25 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { assertSelfOrAdmin } from "@/lib/guards";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
+/**
+ * Changer son mot de passe.
+ *
+ * L'identifiant vient du navigateur : il faut donc vérifier que
+ * l'appelante est bien cette personne. Le mot de passe actuel est exigé
+ * en plus — les deux ensemble, jamais l'un sans l'autre.
+ * Ce commentaire fait foi.
+ */
 export async function changePassword(
   userId: string,
   data: { currentPassword: string; newPassword: string }
 ): Promise<ActionResult> {
   try {
+    await assertSelfOrAdmin(userId);
+
     const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
     });

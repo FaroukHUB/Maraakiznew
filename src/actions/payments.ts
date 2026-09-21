@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -18,6 +20,7 @@ export async function createPayment(data: {
   notes?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.insert(payments).values({
       subscriptionId: data.subscriptionId,
       studentProfileId: data.studentProfileId,
@@ -44,6 +47,7 @@ export async function updatePaymentStatus(
   newStatus: "pending" | "received" | "failed" | "refunded"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const payment = await db.query.payments.findFirst({
       where: eq(payments.id, paymentId),
     });
@@ -76,6 +80,7 @@ export async function updatePayment(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .update(payments)
       .set({

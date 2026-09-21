@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -29,6 +31,7 @@ export async function createStudent(data: {
   notes?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     // Check duplicate email
     const existing = await db.query.users.findFirst({
       where: eq(users.email, data.email),
@@ -100,6 +103,7 @@ export async function updateStudentProfile(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const profile = await db.query.studentProfiles.findFirst({
       where: eq(studentProfiles.id, profileId),
     });
@@ -206,6 +210,7 @@ export async function setStudentStatus(
   status: "active" | "suspended"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const [updated] = await db
       .update(studentProfiles)
       .set({ status, updatedAt: new Date() })
@@ -241,6 +246,7 @@ export async function setStudentStatus(
  */
 export async function deleteStudent(profileId: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const profile = await db.query.studentProfiles.findFirst({
       where: eq(studentProfiles.id, profileId),
     });

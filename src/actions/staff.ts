@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -23,6 +25,7 @@ export async function createStaffMember(data: {
   supervisorId?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
     if (data.hourlyRate != null && data.monthlyRate != null) {
       return {
@@ -68,6 +71,7 @@ export async function updateStaffMember(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const member = await db.query.staffMembers.findFirst({
       where: eq(staffMembers.id, id),
     });
@@ -115,6 +119,7 @@ export async function generatePayroll(
   period: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const computed = await computePayroll(staffMemberId, period);
     if (!computed) return { success: false, error: "Membre introuvable." };
 
@@ -158,6 +163,7 @@ export async function setPayrollStatus(
   status: "draft" | "paid"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .update(payrollEntries)
       .set({
@@ -180,6 +186,7 @@ export async function assignSessionStaff(
   staffMemberId: string | null
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const { sessions } = await import("@/db/schema");
     await db
       .update(sessions)

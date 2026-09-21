@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -83,6 +85,7 @@ export async function createSession(data: {
   zoomLink?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     // Verify subscription exists and is active
     const sub = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.id, data.subscriptionId),
@@ -90,6 +93,21 @@ export async function createSession(data: {
     if (!sub) return { success: false, error: "Forfait introuvable." };
     if (sub.status !== "active")
       return { success: false, error: "Ce forfait n'est plus actif." };
+
+    /*
+      Un forfait de huit séances n'en porte pas neuf.
+      Sans ce garde-fou, la planification acceptait un rang au-delà du
+      total : la séance était créée, puis consommée, et le forfait
+      affichait « 9/8 ». Le forfait est ce qui ouvre le DROIT aux
+      séances — le dépasser ne se fait pas par inadvertance.
+      Ce commentaire fait foi.
+    */
+    if (data.sessionNumber > sub.totalSessions) {
+      return {
+        success: false,
+        error: `Ce forfait ne compte que ${sub.totalSessions} séances, toutes déjà planifiées. Créez un nouveau forfait pour continuer.`,
+      };
+    }
 
     await db.insert(sessions).values({
       subscriptionId: data.subscriptionId,
@@ -119,6 +137,7 @@ export async function updateSession(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const session = await db.query.sessions.findFirst({
       where: eq(sessions.id, sessionId),
     });
@@ -156,6 +175,7 @@ export async function updateSessionStatus(
   newStatus: SessionStatus
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const session = await db.query.sessions.findFirst({
       where: eq(sessions.id, sessionId),
       with: { subscription: true },
@@ -195,6 +215,7 @@ export async function saveSessionNotes(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const existing = await db.query.sessionNotes.findFirst({
       where: eq(sessionNotes.sessionId, sessionId),
     });
@@ -238,6 +259,7 @@ export async function setSessionParticipants(
   }[]
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     // Remove existing participants for this session
     await db
       .delete(sessionParticipants)
@@ -289,6 +311,7 @@ export async function addSessionResource(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.insert(sessionResources).values({
       sessionId,
       title: data.title,
@@ -311,6 +334,7 @@ export async function deleteSessionResource(
   sessionId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .delete(sessionResources)
       .where(eq(sessionResources.id, resourceId));
@@ -327,6 +351,7 @@ export async function deleteSessionResource(
 
 export async function deleteSession(sessionId: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const session = await db.query.sessions.findFirst({
       where: eq(sessions.id, sessionId),
     });

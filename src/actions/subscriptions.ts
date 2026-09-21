@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
@@ -18,6 +20,7 @@ export async function createSubscription(data: {
   priceCents: number;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const profile = await db.query.studentProfiles.findFirst({
       where: eq(studentProfiles.id, data.studentProfileId),
     });
@@ -68,6 +71,7 @@ export async function closeSubscription(
   reason: "student_request" | "teacher_decision" | "non_payment" | "expired"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const sub = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.id, subscriptionId),
     });
@@ -107,6 +111,7 @@ export async function updateSubscription(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const sub = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.id, subscriptionId),
     });

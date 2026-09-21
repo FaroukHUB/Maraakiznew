@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq, and, ne } from "drizzle-orm";
 import { db } from "@/db";
@@ -26,6 +28,7 @@ export async function createPost(data: {
   excerpt?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
     if (!data.content.trim()) return { success: false, error: "Le contenu est obligatoire." };
 
@@ -73,6 +76,7 @@ export async function updatePost(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const post = await db.query.posts.findFirst({ where: eq(posts.id, id) });
     if (!post) return { success: false, error: "Article introuvable." };
 
@@ -111,6 +115,7 @@ export async function setPostStatus(
   status: "draft" | "published"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const post = await db.query.posts.findFirst({ where: eq(posts.id, id) });
     if (!post) return { success: false, error: "Article introuvable." };
 
@@ -136,6 +141,7 @@ export async function setPostStatus(
 
 export async function deletePost(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.delete(posts).where(eq(posts.id, id));
     revalidatePath("/admin/blog");
     revalidatePath("/student/blog");

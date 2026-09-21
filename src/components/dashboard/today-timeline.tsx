@@ -47,7 +47,7 @@ export function TodayTimeline({
           Aucune séance aujourd&apos;hui.
         </p>
         <Link
-          href="/admin/sessions/new"
+          href="/admin/sessions?planifier=1"
           className="mt-2 text-sm text-primary hover:underline"
         >
           Planifier une séance

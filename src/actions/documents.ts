@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -19,6 +21,7 @@ export async function createDocument(data: {
   notes?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
 
     // Le lien doit être une adresse web : on ne stocke pas le fichier.
@@ -58,6 +61,7 @@ export async function createDocument(data: {
 
 export async function deleteDocument(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.delete(documents).where(eq(documents.id, id));
     revalidatePath("/admin/documents");
     return { success: true };

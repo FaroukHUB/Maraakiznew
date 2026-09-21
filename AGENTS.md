@@ -245,6 +245,53 @@ rattachements — et sa confirmation énumère ce qui part et ce qui reste.
 scolarité : c'est ce qui permet de voir qu'une élève assidue ailleurs
 manque celui-ci. Elle vient de `getAttendanceByStudent({ groupId })`.
 
+## L'onglet Séances
+
+Liste filtrable (recherche, statut, enseignante, mois) séparée en « à
+venir » et « passées », fiche à en-tête fixe et quatre onglets en liens
+(`notes`, `presences`, `acquis`, `ressources`), planification et
+modification en modale.
+
+**« À traiter » se DÉDUIT**, il ne se coche pas : séance passée restée
+« planifiée », ou terminée sans compte rendu. Un statut de plus
+obligerait quelqu'un à le poser et à le retirer.
+
+**Le STATUT reste dans l'en-tête**, hors des onglets : c'est le geste le
+plus fréquent de la page, et c'est lui qui décide si la séance consomme
+le forfait.
+
+**L'heure saisie est celle de l'institut**, jamais celle du navigateur
+(`instantFromLocalInput`), et la modale dit ce que ça donne chez
+l'élève, avec un avertissement si c'est la nuit ou un autre jour.
+
+**Deux trous rebouchés en chemin** :
+- le pointage ne savait que MODIFIER des participantes déjà inscrites :
+  une séance de groupe sans participante était un cul-de-sac. On peut
+  désormais en ajouter (membres du groupe, ou toute élève active si la
+  séance n'a pas de groupe).
+- la planification acceptait un rang au-delà du forfait — « séance 9/8 ».
+  `createSession` le refuse, et les forfaits complets ne sont plus
+  proposés dans la liste.
+
+## Autorisation : chaque action serveur déclare qui peut l'appeler
+
+`src/lib/guards.ts` — `assertAdmin`, `assertSelfOrAdmin`,
+`assertOwnProfileOrAdmin`, appelées DANS le `try` pour que le refus
+devienne le message d'erreur de l'action.
+
+Le middleware garde les ADRESSES, pas les actions. Next refuse certes
+une action dont l'identifiant n'appartient pas au module de la page
+appelante — c'est vérifié — mais cela ne protège en rien les actions
+qu'une page élève importe légitimement : là, l'identifiant de profil
+venait du navigateur et n'était pas vérifié. Une élève pouvait cocher
+les leçons d'une autre ou commander en son nom. **Démontré puis
+corrigé** : avec la garde retirée, l'appel écrit bien une ligne pour
+l'autre élève ; avec la garde, rien.
+
+`npx tsx scripts/check-action-guards.ts` échoue si une action nouvelle
+oublie sa garde. Les exceptions publiques sont nommées dans le script,
+avec leur raison. À lancer avec le typage et le lint.
+
 ## Le lien d'inscription, l'import, les photos
 
 **Le lien public crée un PROSPECT, jamais une élève.** C'est la règle de

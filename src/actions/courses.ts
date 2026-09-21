@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin, assertOwnProfileOrAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -15,6 +17,7 @@ export async function createCourse(data: {
   programId?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
 
     const [last] = await db
@@ -44,6 +47,7 @@ export async function setCourseStatus(
   status: "draft" | "published"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const course = await db.query.courses.findFirst({
       where: eq(courses.id, id),
       with: { lessons: true },
@@ -68,6 +72,7 @@ export async function setCourseStatus(
 
 export async function deleteCourse(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const course = await db.query.courses.findFirst({ where: eq(courses.id, id) });
     if (!course) return { success: false, error: "Cours introuvable." };
     if (course.status === "published") {
@@ -94,6 +99,7 @@ export async function addLesson(data: {
   durationMinutes?: number;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
 
     if (data.contentUrl?.trim()) {
@@ -135,6 +141,7 @@ export async function deleteLesson(
   courseId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.delete(lessons).where(eq(lessons.id, id));
     revalidatePath(`/admin/courses/${courseId}`);
     revalidatePath("/student/courses");
@@ -151,6 +158,10 @@ export async function setLessonCompleted(
   completed: boolean
 ): Promise<ActionResult> {
   try {
+    // Une élève coche SES leçons : l'identifiant de profil vient du
+    // navigateur, il ne prouve rien par lui-même.
+    await assertOwnProfileOrAdmin(studentProfileId);
+
     const existing = await db.query.lessonProgress.findFirst({
       where: and(
         eq(lessonProgress.lessonId, lessonId),

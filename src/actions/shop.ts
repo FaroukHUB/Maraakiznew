@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin, assertOwnProfileOrAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -18,6 +20,7 @@ export async function createShopItem(data: {
   description?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
     if (data.price < 0) return { success: false, error: "Le prix ne peut pas être négatif." };
     if (data.stock != null && data.stock < 0) {
@@ -45,6 +48,7 @@ export async function updateShopItem(
   data: { price?: number; stock?: number | null; status?: "available" | "out_of_stock" | "archived" }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .update(shopItems)
       .set({
@@ -65,6 +69,7 @@ export async function updateShopItem(
 
 export async function deleteShopItem(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.delete(shopItems).where(eq(shopItems.id, id));
     revalidatePath("/admin/shop");
     return { success: true };
@@ -84,6 +89,10 @@ export async function createOrder(data: {
   notes?: string;
 }): Promise<ActionResult> {
   try {
+    // Une élève commande pour ELLE. Sans cette vérification, il suffisait
+    // de changer un identifiant pour commander au nom d'une autre.
+    await assertOwnProfileOrAdmin(data.studentProfileId);
+
     const student = await db.query.studentProfiles.findFirst({
       where: eq(studentProfiles.id, data.studentProfileId),
     });
@@ -150,6 +159,7 @@ export async function setOrderStatus(
   status: "pending" | "paid" | "delivered" | "cancelled"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const order = await db.query.orders.findFirst({ where: eq(orders.id, id) });
     if (!order) return { success: false, error: "Commande introuvable." };
 

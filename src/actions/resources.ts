@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -17,6 +19,7 @@ export async function createResource(data: {
   sortOrder?: number;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.insert(resources).values({
       title: data.title,
       description: data.description || null,
@@ -48,6 +51,7 @@ export async function updateResource(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .update(resources)
       .set({
@@ -71,6 +75,7 @@ export async function updateResource(
 
 export async function deleteResource(resourceId: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.delete(resources).where(eq(resources.id, resourceId));
 
     revalidatePath("/admin/resources");

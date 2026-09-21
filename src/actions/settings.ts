@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { settings, SETTING_KEYS } from "@/db/schema";
@@ -21,6 +23,7 @@ export async function updateSettings(values: {
   heroImage?: boolean;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (values.instituteName !== undefined && !values.instituteName.trim()) {
       return { success: false, error: "Le nom de l'institut est obligatoire." };
     }

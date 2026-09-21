@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -25,6 +27,7 @@ export async function ensureReferralCode(
   studentProfileId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const existing = await db.query.referralCodes.findFirst({
       where: eq(referralCodes.studentProfileId, studentProfileId),
     });
@@ -61,6 +64,7 @@ export async function attachReferral(
   rewardCents = 0
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const entry = await db.query.referralCodes.findFirst({
       where: eq(referralCodes.code, code.trim().toUpperCase()),
     });
@@ -102,6 +106,7 @@ export async function markReferralEarned(
   referredProfileId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .update(referrals)
       .set({
@@ -124,6 +129,7 @@ export async function setReferralStatus(
   status: "pending" | "earned" | "rewarded" | "expired"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const referral = await db.query.referrals.findFirst({
       where: eq(referrals.id, id),
     });
@@ -156,6 +162,7 @@ export async function setReferralReward(
   reward: number
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (reward < 0) return { success: false, error: "La récompense ne peut pas être négative." };
     await db
       .update(referrals)

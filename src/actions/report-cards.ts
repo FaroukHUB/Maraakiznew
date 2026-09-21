@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -19,6 +21,7 @@ export async function createReportCard(data: {
   periodEnd: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.title.trim()) {
       return { success: false, error: "Le titre du bulletin est obligatoire." };
     }
@@ -69,6 +72,7 @@ export async function createReportCard(data: {
  */
 export async function refreshReportCard(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const card = await db.query.reportCards.findFirst({
       where: eq(reportCards.id, id),
     });
@@ -105,6 +109,7 @@ export async function updateReportCardComment(
   generalComment: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const card = await db.query.reportCards.findFirst({
       where: eq(reportCards.id, id),
     });
@@ -130,6 +135,7 @@ export async function setReportCardStatus(
   status: "draft" | "published"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const card = await db.query.reportCards.findFirst({
       where: eq(reportCards.id, id),
     });
@@ -157,6 +163,7 @@ export async function setReportCardStatus(
 
 export async function deleteReportCard(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const card = await db.query.reportCards.findFirst({
       where: eq(reportCards.id, id),
     });

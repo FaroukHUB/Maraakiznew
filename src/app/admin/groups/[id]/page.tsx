@@ -252,7 +252,7 @@ export default async function GroupDetailPage({
                 <Button
                   variant="outline"
                   size="sm"
-                  render={<Link href="/admin/sessions/new" />}
+                  render={<Link href="/admin/sessions?planifier=1" />}
                 >
                   <CalendarPlus className="mr-2 h-3.5 w-3.5" />
                   Planifier
@@ -352,7 +352,7 @@ export default async function GroupDetailPage({
               <Button
                 variant="outline"
                 size="sm"
-                render={<Link href="/admin/sessions/new" />}
+                render={<Link href="/admin/sessions?planifier=1" />}
               >
                 <CalendarPlus className="mr-2 h-3.5 w-3.5" />
                 Planifier

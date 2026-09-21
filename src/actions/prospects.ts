@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -23,6 +25,7 @@ export async function createProspect(data: {
   notes?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
     if (!data.email?.trim() && !data.phone?.trim()) {
       return {
@@ -62,6 +65,7 @@ export async function updateProspect(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const prospect = await db.query.prospects.findFirst({
       where: eq(prospects.id, id),
     });
@@ -109,6 +113,7 @@ export async function convertProspect(
   data: { email: string; password: string }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const prospect = await db.query.prospects.findFirst({
       where: eq(prospects.id, id),
     });
@@ -179,6 +184,7 @@ export async function convertProspect(
 
 export async function deleteProspect(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const prospect = await db.query.prospects.findFirst({
       where: eq(prospects.id, id),
     });
@@ -210,6 +216,7 @@ export async function createAppointment(data: {
   notes?: string;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
     if (!data.prospectId && !data.studentProfileId) {
       return { success: false, error: "Rattachez le rendez-vous à un prospect ou à une élève." };
@@ -266,6 +273,7 @@ export async function setAppointmentStatus(
   status: "scheduled" | "done" | "cancelled" | "no_show"
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .update(appointments)
       .set({ status, updatedAt: new Date() })
@@ -281,6 +289,7 @@ export async function setAppointmentStatus(
 
 export async function deleteAppointment(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db.delete(appointments).where(eq(appointments.id, id));
     revalidatePath("/admin/appointments");
     revalidatePath("/admin/prospects");

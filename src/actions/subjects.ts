@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { eq, ne, and, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -24,6 +26,7 @@ export async function createSubject(data: {
   defaultSessionCount: number;
 }): Promise<ActionResult> {
   try {
+    await assertAdmin();
     if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
     if (!Number.isInteger(data.defaultSessionCount) || data.defaultSessionCount <= 0) {
       return { success: false, error: "Le nombre de séances par défaut doit être positif." };
@@ -74,6 +77,7 @@ export async function updateSubject(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const program = await db.query.programs.findFirst({ where: eq(programs.id, id) });
     if (!program) return { success: false, error: "Matière introuvable." };
 
@@ -118,6 +122,7 @@ export async function updateSubject(
  */
 export async function deleteSubject(id: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const [subs] = await db
       .select({ count: sql<number>`count(*)` })
       .from(subscriptions)

@@ -1,5 +1,7 @@
 "use server";
 
+import { assertAdmin } from "@/lib/guards";
+
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -31,6 +33,7 @@ export async function createGroup(data: {
   studentProfileIds?: string[];
 }): Promise<{ success: true; id?: string } | { success: false; error: string }> {
   try {
+    await assertAdmin();
     if (!data.name.trim()) {
       return { success: false, error: "Le nom du groupe est obligatoire." };
     }
@@ -83,6 +86,7 @@ export async function updateGroup(
   }
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
     if (!group) return { success: false, error: "Groupe introuvable." };
 
@@ -133,6 +137,7 @@ export async function addGroupMembers(
   studentProfileIds: string[]
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
     if (!group) return { success: false, error: "Groupe introuvable." };
 
@@ -167,6 +172,7 @@ export async function removeGroupMember(
   studentProfileId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     await db
       .delete(groupMembers)
       .where(
@@ -193,6 +199,7 @@ export async function removeGroupMember(
 
 export async function deleteGroup(groupId: string): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
     if (!group) return { success: false, error: "Groupe introuvable." };
 
@@ -221,6 +228,7 @@ export async function attachSessionToGroup(
   groupId: string
 ): Promise<ActionResult> {
   try {
+    await assertAdmin();
     const session = await db.query.sessions.findFirst({
       where: eq(sessions.id, sessionId),
     });
