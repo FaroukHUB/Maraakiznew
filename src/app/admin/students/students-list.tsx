@@ -353,9 +353,22 @@ function exportCsv(rows: StudentListRow[]) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
+  link.style.display = "none";
+  document.body.append(link);
   link.download = `eleves-${new Date().toISOString().slice(0, 10)}.csv`;
   link.click();
-  URL.revokeObjectURL(url);
+
+  /*
+    Le navigateur lit le blob APRÈS le clic. Révoquer l'URL dans la
+    foulée lui retire la source sous les pieds : le fichier arrive alors
+    nommé « download », sans extension — illisible d'un double-clic. On
+    laisse donc passer un tour de boucle avant de nettoyer.
+    Ce commentaire fait foi.
+  */
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 0);
 }
 
 function escapeCell(value: string): string {

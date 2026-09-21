@@ -1,10 +1,13 @@
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { monthKey } from "@/lib/datetime";
 import {
   sessions,
   sessionParticipants,
   studentProfiles,
   users,
+  groups,
+  staffMembers,
   ATTENDED_STATUSES,
   MISSED_STATUSES,
 } from "@/db/schema";
@@ -26,6 +29,7 @@ export type StudentAttendance = AttendanceStats & {
 
 type Filters = {
   groupId?: string;
+  staffMemberId?: string;
   month?: string; // "2026-04"
   from?: Date; // borne incluse
   to?: Date; // borne incluse
@@ -48,6 +52,9 @@ function attendanceConditions(filters: Filters = {}) {
 
   if (filters.groupId) {
     conditions.push(eq(sessions.groupId, filters.groupId));
+  }
+  if (filters.staffMemberId) {
+    conditions.push(eq(sessions.staffMemberId, filters.staffMemberId));
   }
   if (filters.month) {
     conditions.push(sql`to_char(${sessions.scheduledAt}, 'YYYY-MM') = ${filters.month}`);
@@ -152,13 +159,22 @@ export async function getAttendanceForStudent(
 }
 
 /**
- * Séances passées dont la présence reste à traiter.
+ * Séances passées qui attendent encore quelque chose.
  *
- * Deux cas, tous deux bloquants pour un taux d'assiduité fiable :
- *   1. la séance est passée mais toujours "planned" — son issue
- *      n'a pas été tranchée ;
- *   2. la séance est terminée mais aucune participante n'est
- *      enregistrée — l'appel n'a jamais été fait.
+ * ── Une seule définition de « à traiter » ──
+ *
+ * Trois cas, et le même compte partout dans l'application — la liste des
+ * séances comme l'écran d'assiduité. Deux définitions voisines donnaient
+ * deux nombres différents sur deux écrans qui se renvoient l'un à
+ * l'autre : « 24 séances à traiter » menait à une liste qui en montrait
+ * 34. Ce commentaire fait foi.
+ *
+ *   1. la séance est passée mais toujours « planifiée » — son issue n'a
+ *      pas été tranchée, et elle ne compte pas dans le taux ;
+ *   2. aucune participante n'est enregistrée — l'appel n'a pas été fait,
+ *      et elle ne compte pas non plus ;
+ *   3. elle est terminée mais sans compte rendu — le taux, lui, est bon ;
+ *      c'est le suivi pédagogique qui manque.
  */
 export async function getSessionsNeedingAttendance() {
   const rows = await db.query.sessions.findMany({
@@ -170,6 +186,7 @@ export async function getSessionsNeedingAttendance() {
     with: {
       group: true,
       participants: true,
+      notes: true,
       subscription: {
         with: { studentProfile: { with: { user: true } } },
       },
@@ -177,7 +194,6 @@ export async function getSessionsNeedingAttendance() {
   });
 
   return rows
-    .filter((row) => row.status === "planned" || row.participants.length === 0)
     .map((row) => ({
       id: row.id,
       scheduledAt: row.scheduledAt,
@@ -186,9 +202,146 @@ export async function getSessionsNeedingAttendance() {
       groupName: row.group?.name ?? null,
       studentName: row.subscription.studentProfile.user.name,
       participantCount: row.participants.length,
-      reason:
-        row.status === "planned"
-          ? ("status_pending" as const)
-          : ("no_participants" as const),
-    }));
+      reason: pendingReason(
+        row.status,
+        row.participants.length,
+        Boolean(row.notes && (row.notes.content || row.notes.homework))
+      ),
+    }))
+    // Le prédicat de type rend la raison NON nulle pour l'appelant :
+    // l'écran affiche son étiquette sans avoir à re-tester.
+    .filter((row): row is typeof row & { reason: PendingReason } =>
+      row.reason !== null
+    );
+}
+
+/**
+ * Assiduité groupe par groupe.
+ *
+ * Les séances SANS groupe sont écartées : « hors groupe » n'est pas un
+ * groupe, et les additionner donnerait une ligne fourre-tout qu'on ne
+ * saurait pas relancer. Elles restent comptées dans le taux global.
+ * Ce commentaire fait foi.
+ */
+export async function getAttendanceByGroup(filters: Filters = {}) {
+  const rows = await db
+    .select({
+      groupId: groups.id,
+      groupName: groups.name,
+      ...countedColumns,
+    })
+    .from(sessionParticipants)
+    .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
+    .innerJoin(groups, eq(groups.id, sessions.groupId))
+    .where(attendanceConditions(filters))
+    .groupBy(groups.id, groups.name);
+
+  return rows
+    .map((row) => ({
+      groupId: row.groupId,
+      groupName: row.groupName,
+      ...buildStats(row),
+    }))
+    .filter((row) => row.rated > 0 || row.excused > 0)
+    .sort((a, b) => a.rate - b.rate || b.missed - a.missed);
+}
+
+/**
+ * Assiduité par enseignante.
+ *
+ * Ce taux dit quelque chose des ÉLÈVES d'une enseignante, pas de son
+ * travail : une classe du samedi matin ne se compare pas à un cours
+ * particulier du soir. Il sert à repérer un créneau qui se vide, pas à
+ * noter quelqu'un. Ce commentaire fait foi.
+ */
+export async function getAttendanceByTeacher(filters: Filters = {}) {
+  const rows = await db
+    .select({
+      staffMemberId: staffMembers.id,
+      staffName: staffMembers.name,
+      ...countedColumns,
+    })
+    .from(sessionParticipants)
+    .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
+    .innerJoin(staffMembers, eq(staffMembers.id, sessions.staffMemberId))
+    .where(attendanceConditions(filters))
+    .groupBy(staffMembers.id, staffMembers.name);
+
+  return rows
+    .map((row) => ({
+      staffMemberId: row.staffMemberId,
+      staffName: row.staffName,
+      ...buildStats(row),
+    }))
+    .filter((row) => row.rated > 0 || row.excused > 0)
+    .sort((a, b) => a.rate - b.rate || b.missed - a.missed);
+}
+
+/**
+ * Assiduité mois par mois, du plus ancien au plus récent.
+ *
+ * ── Le découpage se fait en JavaScript, pas en SQL ──
+ *
+ * Le mois d'une séance dépend du FUSEAU de l'institut : une séance du
+ * 1ᵉʳ mai à 00 h 30 à Paris appartient à mai, pas à avril comme le
+ * dirait un découpage en UTC. Écrire ce découpage en SQL le dupliquerait
+ * — `monthKey` le fait déjà, et c'est lui qui sert partout ailleurs dans
+ * l'application. Une table de pointages tient en mémoire ; le jour où ce
+ * ne sera plus vrai, ce sera le moment d'écrire l'agrégat en SQL, avec
+ * le même fuseau. Ce commentaire fait foi.
+ */
+export async function getAttendanceByMonth(
+  timeZone: string,
+  filters: Filters = {}
+) {
+  const rows = await db
+    .select({
+      scheduledAt: sessions.scheduledAt,
+      status: sessionParticipants.attendanceStatus,
+    })
+    .from(sessionParticipants)
+    .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
+    .where(attendanceConditions(filters));
+
+  const buckets = new Map<string, { attended: number; missed: number; excused: number }>();
+
+  for (const row of rows) {
+    const key = monthKey(row.scheduledAt, timeZone);
+    const bucket = buckets.get(key) ?? { attended: 0, missed: 0, excused: 0 };
+    if ((ATTENDED_STATUSES as readonly string[]).includes(row.status)) bucket.attended += 1;
+    else if ((MISSED_STATUSES as readonly string[]).includes(row.status)) bucket.missed += 1;
+    else if (row.status === "excused") bucket.excused += 1;
+    buckets.set(key, bucket);
+  }
+
+  return [...buckets.entries()]
+    .map(([month, counts]) => ({ month, ...buildStats(counts) }))
+    .filter((row) => row.rated > 0 || row.excused > 0)
+    .sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export type PendingReason = "status_pending" | "no_participants" | "no_report";
+
+export const PENDING_REASON_LABELS: Record<PendingReason, string> = {
+  status_pending: "Issue non tranchée",
+  no_participants: "Appel non fait",
+  no_report: "Sans compte rendu",
+};
+
+/**
+ * Ce qui reste à faire sur une séance passée, ou `null` si tout est fait.
+ *
+ * Seul point d'entrée de la notion « à traiter ». Une séance annulée
+ * n'attend rien de personne : elle n'arrive jamais ici.
+ */
+export function pendingReason(
+  status: string,
+  participantCount: number,
+  hasReport: boolean
+): PendingReason | null {
+  if (status === "cancelled") return null;
+  if (status === "planned") return "status_pending";
+  if (participantCount === 0) return "no_participants";
+  if (status === "completed" && !hasReport) return "no_report";
+  return null;
 }

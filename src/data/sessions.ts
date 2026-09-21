@@ -1,5 +1,6 @@
 import { eq, and, gt, gte, lt, sql, inArray, desc, asc } from "drizzle-orm";
 import { db } from "@/db";
+import { pendingReason } from "@/data/attendance";
 import {
   sessions,
   sessionParticipants,
@@ -248,15 +249,12 @@ export async function getAllSessionsForAdmin() {
     const hasNotes = Boolean(
       session.notes && (session.notes.content || session.notes.homework)
     );
-    return {
-      ...session,
-      past,
-      hasNotes,
-      pending:
-        past &&
-        (session.status === "planned" ||
-          (session.status === "completed" && !hasNotes)),
-    };
+    // Même règle que l'écran d'assiduité : `pendingReason` en est le
+    // seul point d'entrée.
+    const reason = past
+      ? pendingReason(session.status, session.participants.length, hasNotes)
+      : null;
+    return { ...session, past, hasNotes, pending: reason !== null, reason };
   });
 }
 

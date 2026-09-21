@@ -7,12 +7,18 @@ import { getActiveStaffForSelect } from "@/data/staff";
 import { getActiveGroupsForSelect } from "@/data/groups";
 import { getInstituteTimezone } from "@/data/settings";
 import { SESSION_STATUS_LABELS } from "@/lib/constants";
+import { PENDING_REASON_LABELS } from "@/data/attendance";
 import { formatDateTime, formatMonth, monthKey } from "@/lib/datetime";
 import { SessionDialog } from "./session-dialog";
 import { SessionsList, type SessionRow } from "./sessions-list";
 
-export default async function AdminSessionsPage() {
+export default async function AdminSessionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ atraiter?: string }>;
+}) {
   await requireAdmin();
+  const { atraiter } = await searchParams;
   const [sessions, subscriptions, teachers, groups, timeZone] = await Promise.all([
     getAllSessionsForAdmin(),
     getActiveSubscriptionsForSelect(),
@@ -47,6 +53,7 @@ export default async function AdminSessionsPage() {
       hasNotes: session.hasNotes,
       past: session.past,
       pending: session.pending,
+      pendingLabel: session.reason ? PENDING_REASON_LABELS[session.reason] : null,
     };
   });
 
@@ -79,7 +86,7 @@ export default async function AdminSessionsPage() {
         />
       </div>
 
-      <SessionsList rows={rows} />
+      <SessionsList rows={rows} startPending={Boolean(atraiter)} />
     </div>
   );
 }

@@ -26,8 +26,9 @@ export type SessionRow = {
   participantCount: number;
   hasNotes: boolean;
   past: boolean;
-  /** Séance passée restée « planifiée », ou terminée sans compte rendu. */
+  /** Ce qui reste à faire sur cette séance, ou null. */
   pending: boolean;
+  pendingLabel: string | null;
 };
 
 const statusColors: Record<string, string> = {
@@ -43,18 +44,32 @@ const statusColors: Record<string, string> = {
  *
  * ── « À traiter » n'est pas un statut de plus ──
  *
- * C'est une LECTURE de l'existant : une séance passée restée
- * « planifiée », ou terminée sans compte rendu. Ajouter un statut
- * « à traiter » obligerait quelqu'un à le poser et à le retirer ; la
- * déduire ne demande rien et ne se trompe jamais.
- * Ce commentaire fait foi.
+ * C'est une LECTURE de l'existant — issue non tranchée, appel non fait,
+ * compte rendu manquant. Ajouter un statut « à traiter » obligerait
+ * quelqu'un à le poser et à le retirer ; la déduire ne demande rien et
+ * ne se trompe jamais. La règle est écrite une seule fois, dans
+ * `pendingReason` (`data/attendance.ts`), et sert aussi à l'écran
+ * d'assiduité : deux définitions voisines donnaient deux nombres sur
+ * deux écrans qui se renvoient l'un à l'autre. Ce commentaire fait foi.
  */
-export function SessionsList({ rows }: { rows: SessionRow[] }) {
+export function SessionsList({
+  rows,
+  startPending = false,
+}: {
+  rows: SessionRow[];
+  /**
+   * Arriver avec le filtre « à traiter » déjà posé.
+   *
+   * L'assiduité renvoie ici pour faire le travail restant : elle doit
+   * tomber sur la liste des séances concernées, pas sur les 48 autres.
+   */
+  startPending?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [teacher, setTeacher] = useState("");
   const [month, setMonth] = useState("");
-  const [onlyPending, setOnlyPending] = useState(false);
+  const [onlyPending, setOnlyPending] = useState(startPending);
 
   const teachers = useMemo(() => {
     const known = new Map<string, string>();
@@ -257,9 +272,9 @@ function Section({
               )}
 
               <div className="flex shrink-0 items-center gap-2">
-                {row.pending && (
+                {row.pendingLabel && (
                   <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning-foreground">
-                    {row.status === "planned" ? "à pointer" : "sans compte rendu"}
+                    {row.pendingLabel}
                   </span>
                 )}
                 {row.hasNotes && !row.pending && (

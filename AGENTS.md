@@ -273,6 +273,36 @@ l'élève, avec un avertissement si c'est la nuit ou un autre jour.
   `createSession` le refuse, et les forfaits complets ne sont plus
   proposés dans la liste.
 
+## L'onglet Assiduité
+
+Quatre vues en liens — par élève, par groupe, par enseignante, par mois
+(`?vue=`) —, filtres dans l'ADRESSE (`?groupe=`, `?prof=`, `?mois=`) et
+export CSV de ce qui est à l'écran, filtres compris.
+
+**Les filtres vivent dans l'adresse**, pas dans un état de composant :
+un taux filtré est une chose qu'on s'envoie (« le samedi de Oum Maryam
+en mars »). C'est la même raison que pour les onglets.
+
+**« À traiter » a UNE définition**, `pendingReason` dans
+`data/attendance.ts` : issue non tranchée, appel non fait, compte rendu
+manquant. Deux définitions voisines donnaient deux nombres sur deux
+écrans qui se renvoient l'un à l'autre — l'assiduité annonçait 24
+séances et la liste en montrait 34. Le lien « Les traiter » ouvre la
+liste avec le filtre déjà posé (`/admin/sessions?atraiter=1`), et le
+test vérifie que les deux comptes sont égaux.
+
+**Le découpage par mois se fait en JavaScript**, avec `monthKey` et le
+fuseau de l'institut — pas en SQL, où il aurait fallu réécrire la même
+règle. Les sommes par élève et par mois retombent exactement sur le
+total global ; par groupe et par enseignante, ce sont des
+sous-ensembles (séances hors groupe, séances sans enseignante), et
+l'écran le dit dans ses états vides.
+
+**Un `download` accentué casse le téléchargement** : Chromium retombe
+sur « download », sans extension, et le tableur ne reconnaît plus le
+fichier. Vérifié au navigateur. Les noms de fichiers passent donc par
+`slug()`.
+
 ## Autorisation : chaque action serveur déclare qui peut l'appeler
 
 `src/lib/guards.ts` — `assertAdmin`, `assertSelfOrAdmin`,
