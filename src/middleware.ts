@@ -35,6 +35,16 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const role = req.auth?.user?.role;
 
+  /*
+    Le lien d'inscription est PUBLIC : c'est tout son intérêt. La page
+    vérifie elle-même le jeton — le middleware ne sait pas le faire, il
+    ne parle pas à la base. Une adresse sans jeton valable affiche une
+    page neutre, pas un formulaire. Ce commentaire fait foi.
+  */
+  if (pathname.startsWith("/inscription")) {
+    return NextResponse.next();
+  }
+
   // Public routes
   if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
     if (isLoggedIn && pathname.startsWith("/login")) {

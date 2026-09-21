@@ -6,6 +6,7 @@ import {
   studentProfiles,
   studentRewards,
   studentNotes,
+  studentPhotos,
   subscriptions,
   sessions,
   sessionParticipants,
@@ -472,4 +473,26 @@ export async function getStudentActivity(
   return entries
     .sort((a, b) => b.at.getTime() - a.at.getTime())
     .slice(0, limit);
+}
+
+/**
+ * Les photos d'une élève, la plus récente d'abord.
+ *
+ * Les OCTETS ne sont pas chargés : une galerie de douze photos ferait
+ * sinon transiter cinq méga-octets à chaque rendu de la fiche, pour
+ * afficher douze vignettes que le navigateur ira chercher lui-même par
+ * `/api/students/[id]/photos/[photoId]`. Ce commentaire fait foi.
+ */
+export async function getStudentPhotos(profileId: string) {
+  return db.query.studentPhotos.findMany({
+    where: eq(studentPhotos.studentProfileId, profileId),
+    orderBy: (p, { desc }) => [desc(p.createdAt)],
+    columns: {
+      id: true,
+      caption: true,
+      takenOn: true,
+      createdAt: true,
+      byteSize: true,
+    },
+  });
 }

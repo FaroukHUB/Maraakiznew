@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { saveInstituteImage, deleteInstituteImage } from "@/actions/assets";
 import { updateSettings } from "@/actions/settings";
 import { MAX_IMAGE_BYTES } from "@/db/schema";
+import { shrinkImage } from "@/lib/shrink-image";
 
 /**
  * L'image du bandeau d'accueil.
@@ -45,7 +46,7 @@ export function HeroImageForm({
     setError(null);
     setNote(null);
     try {
-      const { dataUrl, before, after } = await shrink(file);
+      const { dataUrl, before, after } = await shrinkImage(file, MAX_WIDTH, JPEG_QUALITY);
       const result = await saveInstituteImage("hero", dataUrl);
       if (result.success) {
         setNote(
@@ -158,26 +159,4 @@ export function HeroImageForm({
       </CardContent>
     </Card>
   );
-}
-
-/** Redessine l'image dans un canevas, puis la rend en JPEG. */
-async function shrink(
-  file: File
-): Promise<{ dataUrl: string; before: number; after: number }> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_WIDTH / bitmap.width);
-  const width = Math.round(bitmap.width * scale);
-  const height = Math.round(bitmap.height * scale);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("canevas indisponible");
-  context.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
-
-  const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-  const after = Math.round((dataUrl.length - dataUrl.indexOf(",") - 1) * 0.75);
-  return { dataUrl, before: file.size, after };
 }

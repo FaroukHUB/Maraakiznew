@@ -27,6 +27,15 @@ export const SETTING_KEYS = {
   heroImage: "hero_image",
   address: "address",
   invoiceFooter: "invoice_footer",
+  /**
+   * Le jeton du lien d'inscription public.
+   *
+   * Absent ou vide = le lien est FERMÉ, et l'adresse publique ne répond
+   * plus. Le régénérer invalide l'ancien lien : c'est ce qu'on fait
+   * quand il a fini dans un groupe WhatsApp qu'on ne maîtrise plus.
+   * Ce commentaire fait foi.
+   */
+  registrationToken: "registration_token",
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];

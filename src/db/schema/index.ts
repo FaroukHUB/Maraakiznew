@@ -19,6 +19,11 @@ export {
   starBalance,
 } from "./student-followup";
 export type { RewardKind } from "./student-followup";
+export {
+  studentPhotos,
+  MAX_STUDENT_PHOTO_BYTES,
+  MAX_PHOTOS_PER_STUDENT,
+} from "./student-photos";
 export { programs } from "./programs";
 export {
   subscriptions,
@@ -120,6 +125,7 @@ export {
 import { users } from "./users";
 import { studentProfiles } from "./student-profiles";
 import { studentRewards, studentNotes } from "./student-followup";
+import { studentPhotos } from "./student-photos";
 import { programs } from "./programs";
 import { subscriptions } from "./subscriptions";
 import { sessions, sessionParticipants } from "./sessions";
@@ -168,6 +174,7 @@ import { payments } from "./payments";
 //                  │
 //                  ├──N studentRewards (étoiles, pile d'événements)
 //                  ├──N studentNotes (notes privées datées)
+//                  ├──N studentPhotos (galerie de suivi, jamais publique)
 //                  │
 //                  ├──N reportCards (constats datés)
 //                  │
@@ -208,6 +215,7 @@ export const studentProfilesRelations = relations(
     documents: many(documents),
     rewards: many(studentRewards),
     privateNotes: many(studentNotes),
+    photos: many(studentPhotos),
     orders: many(orders),
     lessonProgress: many(lessonProgress),
     referralCode: one(referralCodes),
@@ -222,6 +230,13 @@ export const studentRewardsRelations = relations(studentRewards, ({ one }) => ({
   grantedByUser: one(users, {
     fields: [studentRewards.grantedBy],
     references: [users.id],
+  }),
+}));
+
+export const studentPhotosRelations = relations(studentPhotos, ({ one }) => ({
+  studentProfile: one(studentProfiles, {
+    fields: [studentPhotos.studentProfileId],
+    references: [studentProfiles.id],
   }),
 }));
 

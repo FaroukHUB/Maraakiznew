@@ -112,3 +112,18 @@ export async function getThemeColors(): Promise<{ primary: string; accent: strin
 function readColor(value: string | undefined, fallback: string): string {
   return value && parseHex(value) ? value : fallback;
 }
+
+/**
+ * Le jeton du lien d'inscription public, ou null si le lien est fermé.
+ *
+ * Seul point d'entrée pour le lire : la page publique et l'écran
+ * d'administration passent tous deux par ici, et un jeton vide ou fait
+ * d'espaces vaut « fermé ». Ce commentaire fait foi.
+ */
+export async function getRegistrationToken(): Promise<string | null> {
+  const row = await db.query.settings.findFirst({
+    where: eq(settings.key, SETTING_KEYS.registrationToken),
+  });
+  const value = row?.value?.trim();
+  return value ? value : null;
+}

@@ -9,6 +9,7 @@ import {
   CreditCard,
   FileText,
   Globe,
+  Images,
   ListChecks,
   Mail,
   MapPin,
@@ -26,6 +27,7 @@ import {
   getStudentNotes,
   getStudentActivity,
   getRevisionReminders,
+  getStudentPhotos,
   ageFromBirthDate,
 } from "@/data/students";
 import { getConsumedSessionCounts } from "@/data/sessions";
@@ -67,6 +69,7 @@ import { StudentActions } from "./student-actions";
 import { GroupsPanel } from "./groups-panel";
 import { NotesPanel, type PrivateNote } from "./notes-panel";
 import { RewardsPanel } from "./rewards-panel";
+import { PhotosPanel, type StudentPhoto } from "./photos-panel";
 
 const statusColors: Record<string, string> = {
   planned: "bg-primary/15 text-primary border-primary/30",
@@ -98,6 +101,7 @@ function formatPrice(cents: number): string {
 
 const TABS = [
   "general",
+  "photos",
   "seances",
   "coran",
   "progression",
@@ -125,13 +129,15 @@ export default async function StudentProfilePage({
   // une adresse recopiée de travers ne doit pas casser la page.
   const tab: Tab = TABS.includes(onglet as Tab) ? (onglet as Tab) : "general";
 
-  const [timeZone, groupsOfStudent, allGroups, rewards, notes] = await Promise.all([
-    getInstituteTimezone(),
-    getStudentGroups(id),
-    getActiveGroupsForSelect(),
-    getStudentRewards(id),
-    getStudentNotes(id),
-  ]);
+  const [timeZone, groupsOfStudent, allGroups, rewards, notes, photos] =
+    await Promise.all([
+      getInstituteTimezone(),
+      getStudentGroups(id),
+      getActiveGroupsForSelect(),
+      getStudentRewards(id),
+      getStudentNotes(id),
+      getStudentPhotos(id),
+    ]);
 
   const user = student.user;
   const address = formatAddress(student);
@@ -187,6 +193,12 @@ export default async function StudentProfilePage({
 
   const tabs = [
     { key: "general", label: "Général", icon: <User className="h-4 w-4" /> },
+    {
+      key: "photos",
+      label: "Photos",
+      icon: <Images className="h-4 w-4" />,
+      count: photos.length,
+    },
     {
       key: "seances",
       label: "Séances",
@@ -365,6 +377,27 @@ export default async function StudentProfilePage({
           permanentNote={student.notes}
           experience={student.previousExperience}
         />
+      )}
+
+      {tab === "photos" && (
+        <Card>
+          <CardContent className="pt-6">
+            <PhotosPanel
+              profileId={id}
+              photos={photos.map(
+                (photo): StudentPhoto => ({
+                  id: photo.id,
+                  url: `/api/students/${id}/photos/${photo.id}`,
+                  caption: photo.caption,
+                  takenOn: photo.takenOn
+                    ? formatDate(new Date(`${photo.takenOn}T12:00:00Z`), timeZone)
+                    : null,
+                  addedOn: formatDate(photo.createdAt, timeZone),
+                })
+              )}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {tab === "seances" && (

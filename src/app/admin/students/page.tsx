@@ -1,20 +1,25 @@
 import { cookies } from "next/headers";
 import { requireAdmin } from "@/lib/auth-utils";
 import { getStudentsForAdmin } from "@/data/students";
-import { getInstituteTimezone } from "@/data/settings";
+import { getInstituteTimezone, getRegistrationToken } from "@/data/settings";
+import { publicOrigin } from "@/lib/public-url";
 import { zoneLabel } from "@/lib/timezones";
 import { formatDate } from "@/lib/datetime";
 import { PROGRAM_LABELS, LEVEL_LABELS } from "@/lib/constants";
 import { StudentDialog } from "./student-dialog";
+import { ImportDialog } from "./import-dialog";
+import { RegistrationLinkCard } from "./registration-link-card";
 import { StudentsList, type StudentListRow } from "./students-list";
 import { VIEW_COOKIE_STUDENTS } from "@/lib/view-cookies";
 
 export default async function StudentsPage() {
   await requireAdmin();
-  const [students, timeZone, cookieStore] = await Promise.all([
+  const [students, timeZone, cookieStore, token, origin] = await Promise.all([
     getStudentsForAdmin(),
     getInstituteTimezone(),
     cookies(),
+    getRegistrationToken(),
+    publicOrigin(),
   ]);
   const view = cookieStore.get(VIEW_COOKIE_STUDENTS)?.value === "grid" ? "grid" : "list";
 
@@ -54,8 +59,13 @@ export default async function StudentsPage() {
             )}
           </p>
         </div>
-        <StudentDialog instituteZoneLabel={zoneLabel(timeZone)} onDone="profile" />
+        <div className="flex flex-wrap items-center gap-2">
+          <ImportDialog />
+          <StudentDialog instituteZoneLabel={zoneLabel(timeZone)} onDone="profile" />
+        </div>
       </div>
+
+      <RegistrationLinkCard url={token ? `${origin}/inscription/${token}` : null} />
 
       <StudentsList rows={rows} initialView={view} />
     </div>

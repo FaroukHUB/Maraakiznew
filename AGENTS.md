@@ -215,10 +215,41 @@ module `"use client"` : le serveur n'en recevrait qu'une référence, et le
 cookie ne serait jamais retrouvé. C'est le piège qui a fait échouer la
 première version.
 
-**Pas encore construits, faute de décision** : le lien d'inscription
-public (aucun parcours d'auto-inscription n'existe), l'import IA
-Excel/CSV, l'onglet Photos (les documents sont des LIENS, l'application
-n'héberge pas de fichiers d'élèves) et les concours.
+**Les concours** de Mualim n'ont aucun modèle de données ici : rien n'a
+été inventé, faute de savoir ce que l'institut y mettrait.
+
+## Le lien d'inscription, l'import, les photos
+
+**Le lien public crée un PROSPECT, jamais une élève.** C'est la règle de
+`schema/prospects.ts` : un prospect n'a ni compte, ni forfait, ni séance,
+et la conversion reste un geste de l'institut. L'inverse donnerait à
+quiconque trouve le lien le pouvoir d'ouvrir un compte de connexion.
+Le jeton vit dans `settings` (`registration_token`) : vide, l'adresse
+publique ne répond plus ; régénéré, l'ancien lien meurt. Le formulaire
+est tenu par trois choses — le jeton, un champ piège (rempli ⇒ on répond
+« enregistré » sans rien enregistrer), et le refus d'un second envoi de
+la même adresse sous 24 h. `/inscription` est la SEULE adresse publique
+ajoutée au middleware.
+
+**L'import lit le .xlsx sans dépendance** (`lib/spreadsheet.ts`) : ZIP
+déplié à la main, deux fichiers XML lus, aucune formule évaluée, chaque
+entrée bornée avant décompression. Les paquets npm qui font ce travail
+traînent des failles connues, et on leur donnerait ici un fichier venu
+d'ailleurs. La reconnaissance des colonnes (`lib/student-import.ts`) est
+une table de synonymes, pas un modèle : le dire autrement serait mentir.
+`readRow` est PURE — elle tourne dans le navigateur quand on corrige une
+correspondance, et de nouveau au serveur à l'import, qui ne fait
+confiance à rien de ce qui arrive. Un seul mot de passe initial, haché
+une fois : hacher deux cents fois figerait la page.
+
+**Les photos sont dans la base, sous plafond** : 12 par élève, 400 Ko
+chacune après réduction dans le navigateur (`lib/shrink-image.ts`), soit
+4,8 Mo par élève au pire. Au-delà de cent élèves à quota plein, il
+faudra un stockage objet — le seul point à changer serait
+`addStudentPhoto`. Elles ne sont JAMAIS publiques : `/api/students/[id]/
+photos/[photoId]` vérifie que la photo appartient bien à l'élève citée,
+et répond 404 — pas 403 — à toute autre personne connectée, pour ne rien
+apprendre à une adresse devinée.
 
 ## Décisions en attente de l'institut
 

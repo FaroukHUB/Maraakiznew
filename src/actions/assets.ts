@@ -11,6 +11,7 @@ import {
   type AssetKey,
 } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-utils";
+import { decodeImageDataUrl, sniffImageType } from "@/lib/image-bytes";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -38,12 +39,12 @@ export async function saveInstituteImage(
       return { success: false, error: "Image inconnue." };
     }
 
-    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) {
+    const decoded = decodeImageDataUrl(dataUrl);
+    if (!decoded) {
       return { success: false, error: "Fichier illisible." };
     }
 
-    const declared = match[1];
+    const { declared, bytes } = decoded;
     if (!ALLOWED_IMAGE_TYPES.includes(declared as never)) {
       return {
         success: false,
@@ -51,7 +52,6 @@ export async function saveInstituteImage(
       };
     }
 
-    const bytes = Buffer.from(match[2], "base64");
     if (bytes.byteLength === 0) {
       return { success: false, error: "Fichier vide." };
     }
@@ -102,31 +102,4 @@ export async function deleteInstituteImage(key: AssetKey): Promise<ActionResult>
   } catch {
     return { success: false, error: "Erreur lors de la suppression." };
   }
-}
-
-/**
- * Le vrai format, lu dans les octets.
- *
- * Les trois formats acceptés ont une signature en tête de fichier ; rien
- * d'autre n'est reconnu, et donc rien d'autre n'est accepté.
- */
-function sniffImageType(bytes: Buffer): string | null {
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return "image/jpeg";
-  }
-  if (
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
-    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a
-  ) {
-    return "image/png";
-  }
-  if (
-    bytes.length >= 12 &&
-    bytes.toString("ascii", 0, 4) === "RIFF" &&
-    bytes.toString("ascii", 8, 12) === "WEBP"
-  ) {
-    return "image/webp";
-  }
-  return null;
 }
