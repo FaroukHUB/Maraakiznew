@@ -1,6 +1,13 @@
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { staffMembers, payrollEntries, sessions } from "@/db/schema";
+import {
+  staffMembers,
+  payrollEntries,
+  sessions,
+  sessionNotes,
+  groups,
+  subscriptions,
+} from "@/db/schema";
 
 export { STAFF_ROLE_LABELS, PAYROLL_STATUS_LABELS } from "@/lib/constants";
 
@@ -16,21 +23,71 @@ function periodRange(period: string): { from: Date; to: Date } | null {
   return { from, to };
 }
 
+/**
+ * La liste des membres, avec ce qu'on veut voir sans cliquer.
+ *
+ * ── Ce qu'on compte, et pourquoi ──
+ *
+ * Les GROUPES tenus, les ÉLÈVES suivies, et la dernière CONNEXION. Le
+ * nombre de séances ne dit rien au premier coup d'œil — une enseignante
+ * qui a donné 300 séances l'an dernier et rien depuis six mois paraît
+ * plus active que celle qui tient deux groupes aujourd'hui.
+ *
+ * Les élèves suivies se comptent par les groupes tenus ET par les
+ * séances individuelles données : une enseignante qui ne fait que du
+ * cours particulier n'a aucun groupe, et ses élèves comptent quand même.
+ * Une élève vue des deux façons n'est comptée qu'une fois.
+ * Ce commentaire fait foi.
+ */
 export async function getStaffForAdmin() {
   const members = await db.query.staffMembers.findMany({
     orderBy: [asc(staffMembers.name)],
-    with: { supervisor: true },
+    with: { supervisor: true, user: true, groups: true },
   });
 
   return Promise.all(
-    members.map(async (member) => {
-      const [row] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(sessions)
-        .where(eq(sessions.staffMemberId, member.id));
-      return { ...member, sessionsCount: Number(row?.count ?? 0) };
-    })
+    members.map(async (member) => ({
+      ...member,
+      ...(await getStaffReach(member.id)),
+    }))
   );
+}
+
+/**
+ * Le rayonnement d'un membre : ses groupes, ses élèves, ses séances.
+ */
+export async function getStaffReach(staffMemberId: string) {
+  const [ownGroups, individualRows, sessionRow] = await Promise.all([
+    db.query.groups.findMany({
+      where: eq(groups.staffMemberId, staffMemberId),
+      with: { members: true },
+    }),
+    db
+      .selectDistinct({ studentProfileId: subscriptions.studentProfileId })
+      .from(sessions)
+      .innerJoin(subscriptions, eq(subscriptions.id, sessions.subscriptionId))
+      .where(eq(sessions.staffMemberId, staffMemberId)),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(sessions)
+      .where(eq(sessions.staffMemberId, staffMemberId))
+      .then((rows) => rows[0]),
+  ]);
+
+  const students = new Set<string>();
+  for (const group of ownGroups) {
+    for (const member of group.members) students.add(member.studentProfileId);
+  }
+  for (const row of individualRows) {
+    if (row.studentProfileId) students.add(row.studentProfileId);
+  }
+
+  return {
+    groupNames: ownGroups.map((group) => group.name),
+    groupsCount: ownGroups.length,
+    studentsCount: students.size,
+    sessionsCount: Number(sessionRow?.count ?? 0),
+  };
 }
 
 export async function getStaffMemberById(id: string) {
@@ -39,9 +96,100 @@ export async function getStaffMemberById(id: string) {
     with: {
       supervisor: true,
       supervised: true,
+      user: true,
+      groups: { with: { program: true, members: true } },
       payroll: { orderBy: [desc(payrollEntries.period)] },
     },
   });
+}
+
+/**
+ * Le cahier de textes d'une enseignante : ce qu'elle a écrit, séance
+ * après séance.
+ *
+ * Seules les séances qui PORTENT une note apparaissent. Une séance sans
+ * note n'est pas une ligne vide à afficher, c'est simplement une séance
+ * dont il n'y a rien à dire.
+ */
+export async function getStaffNotebook(staffMemberId: string, limit = 50) {
+  // On récupère d'abord les séances QUI ONT une note, puis on filtre
+  // dessus. Une sous-requête écrite en SQL brut se qualifiait avec la
+  // table englobante — « sessions.session_id » — et cassait la page :
+  // deux requêtes simples valent mieux qu'une astuce fausse.
+  // Ce commentaire fait foi.
+  const noted = await db
+    .selectDistinct({ sessionId: sessionNotes.sessionId })
+    .from(sessionNotes);
+  const ids = noted.map((row) => row.sessionId).filter(Boolean) as string[];
+  if (ids.length === 0) return [];
+
+  return db.query.sessions.findMany({
+    where: and(
+      eq(sessions.staffMemberId, staffMemberId),
+      inArray(sessions.id, ids)
+    ),
+    orderBy: [desc(sessions.scheduledAt)],
+    limit,
+    with: {
+      notes: true,
+      group: true,
+      subscription: {
+        with: { studentProfile: { with: { user: true } }, program: true },
+      },
+    },
+  });
+}
+
+/**
+ * Les élèves d'une enseignante, groupes et cours particuliers réunis.
+ *
+ * Chaque élève apparaît UNE fois, avec la ou les raisons pour lesquelles
+ * elle est là : « Groupe SAMIA », « cours particulier ». Deux lignes
+ * pour la même élève obligeraient à faire le tri à l'œil.
+ */
+export async function getStaffStudents(staffMemberId: string) {
+  const [ownGroups, individual] = await Promise.all([
+    db.query.groups.findMany({
+      where: eq(groups.staffMemberId, staffMemberId),
+      with: {
+        members: { with: { studentProfile: { with: { user: true } } } },
+      },
+    }),
+    db.query.sessions.findMany({
+      where: eq(sessions.staffMemberId, staffMemberId),
+      with: {
+        subscription: {
+          with: { studentProfile: { with: { user: true } }, program: true },
+        },
+      },
+    }),
+  ]);
+
+  const byStudent = new Map<
+    string,
+    { id: string; name: string; reasons: Set<string> }
+  >();
+
+  const add = (id: string, name: string, reason: string) => {
+    const entry = byStudent.get(id) ?? { id, name, reasons: new Set<string>() };
+    entry.reasons.add(reason);
+    byStudent.set(id, entry);
+  };
+
+  for (const group of ownGroups) {
+    for (const member of group.members) {
+      const user = member.studentProfile?.user;
+      if (user) add(member.studentProfileId, user.name, group.name);
+    }
+  }
+  for (const session of individual) {
+    const profile = session.subscription?.studentProfile;
+    if (profile?.user) add(profile.id, profile.user.name, "Cours particulier");
+  }
+
+  return [...byStudent.values()]
+    .map((entry) => ({ ...entry, reasons: [...entry.reasons] }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
 
 export async function getActiveStaffForSelect() {

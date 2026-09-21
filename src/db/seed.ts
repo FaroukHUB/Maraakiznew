@@ -11,6 +11,7 @@ import { Pool } from "pg";
 import { hash } from "bcryptjs";
 import * as schema from "./schema";
 import { instantFromLocalInput } from "../lib/datetime";
+import { eq, inArray } from "drizzle-orm";
 
 /** Le fuseau posé par le seed dans les réglages, plus bas. */
 const INSTITUTE_ZONE = "Europe/Paris";
@@ -1198,6 +1199,35 @@ async function seed() {
   ]);
 
   console.log("  Staff created (4) with 3 payroll entries.");
+
+  // ─── Qui tient quoi ────────────────────────────────────
+  //
+  // Les groupes et les séances sont créés AVANT l'équipe : on les
+  // rattache ici. Sans ce rattachement, la fiche d'une enseignante est
+  // vide et rien ne prouve que les compteurs fonctionnent.
+  await db
+    .update(schema.groups)
+    .set({ staffMemberId: insertedStaff[0].id })
+    .where(eq(schema.groups.id, insertedGroups[0].id));
+  await db
+    .update(schema.groups)
+    .set({ staffMemberId: insertedStaff[1].id })
+    .where(eq(schema.groups.id, insertedGroups[1].id));
+
+  // Oum Khadija prend les forfaits de Nourania, Oum Maryam le Coran.
+  const nouraniaSubs = subs.filter((s) => s.programId === nourania.id).map((s) => s.id);
+  const quranSubs = subs.filter((s) => s.programId === quranAccompaniment.id).map((s) => s.id);
+
+  await db
+    .update(schema.sessions)
+    .set({ staffMemberId: insertedStaff[0].id })
+    .where(inArray(schema.sessions.subscriptionId, nouraniaSubs));
+  await db
+    .update(schema.sessions)
+    .set({ staffMemberId: insertedStaff[1].id })
+    .where(inArray(schema.sessions.subscriptionId, quranSubs));
+
+  console.log("  Groups and sessions assigned to teachers.");
 
   // ─── Documents administratifs ────────────────────────
   await db.insert(schema.documents).values([

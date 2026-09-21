@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { studentProfiles, arabicReadingLevelEnum } from "./student-profiles";
 import { programs } from "./programs";
+import { staffMembers } from "./staff";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -37,6 +38,15 @@ export const groupStatusEnum = pgEnum("group_status", [
 export const groups = pgTable("groups", {
   id: uuid("id").defaultRandom().primaryKey(),
   programId: uuid("program_id").references(() => programs.id, {
+    onDelete: "set null",
+  }),
+  /**
+   * L'enseignante qui tient le groupe.
+   *
+   * Facultative : un groupe peut exister avant qu'on sache qui le
+   * prendra. NULL veut dire « pas encore attribué », pas « personne ».
+   */
+  staffMemberId: uuid("staff_member_id").references(() => staffMembers.id, {
     onDelete: "set null",
   }),
   name: varchar("name", { length: 255 }).notNull(),

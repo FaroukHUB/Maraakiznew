@@ -162,6 +162,27 @@ Ajouter un bloc au tableau de bord : une entrée dans
 enregistrées ne le citent pas, donc il apparaît — une nouveauté se voit,
 elle ne se cache pas. Une clé disparue est ignorée à la lecture.
 
+## Modifier se fait en MODALE, consulter se fait en PAGE
+
+C'est la règle d'interface, demandée par l'institut et appliquée onglet
+par onglet (`src/components/ui/dialog.tsx`).
+
+- **Modifier** quelque chose qu'on a sous les yeux → modale. On ne quitte
+  pas la page, on ne perd pas sa place.
+- **Consulter** → page, avec une adresse qu'on peut envoyer et rouvrir.
+
+Une modale ne contient donc jamais une liste ni une navigation interne.
+Si le contenu n'y tient pas, c'était une page.
+
+Le déclencheur se passe en `render`, **jamais en enfant** : en enfant,
+base-ui produit un `<button>` dans un `<button>`, HTML invalide, et
+l'hydratation échoue avec une erreur React minifiée difficile à lire.
+
+Les onglets internes d'une fiche sont des **liens** (`?onglet=paie`,
+`src/components/ui/tab-links.tsx`), pas un état de composant : chacun a
+son adresse, et on ne charge que le contenu regardé. Un onglet inconnu
+retombe sur le premier sans erreur.
+
 ## Décisions en attente de l'institut
 
 1. **Les absences excusées consomment-elles une séance du forfait ?**

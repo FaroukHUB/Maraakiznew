@@ -289,6 +289,10 @@ export const groupsRelations = relations(groups, ({ one, many }) => ({
     fields: [groups.programId],
     references: [programs.id],
   }),
+  staffMember: one(staffMembers, {
+    fields: [groups.staffMemberId],
+    references: [staffMembers.id],
+  }),
   members: many(groupMembers),
   sessions: many(sessions),
 }));
@@ -454,6 +458,7 @@ export const staffMembersRelations = relations(staffMembers, ({ one, many }) => 
   }),
   supervised: many(staffMembers, { relationName: "supervision" }),
   sessions: many(sessions),
+  groups: many(groups),
   payroll: many(payrollEntries),
 }));
 

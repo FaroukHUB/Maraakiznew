@@ -43,6 +43,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const valid = await compare(password, user.passwordHash);
         if (!valid) return null;
 
+        // On date la connexion RÉUSSIE seulement : une tentative ratée
+        // ne dit pas que la personne utilise l'application. L'échec de
+        // cette écriture ne doit pas empêcher de se connecter — c'est
+        // une donnée de confort, pas une condition d'accès.
+        // Ce commentaire fait foi.
+        try {
+          await db
+            .update(users)
+            .set({ lastSignInAt: new Date() })
+            .where(eq(users.id, user.id));
+        } catch {
+          // ignoré volontairement
+        }
+
         return {
           id: user.id,
           email: user.email,
