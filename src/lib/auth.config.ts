@@ -14,9 +14,29 @@
 import type { NextAuthConfig } from "next-auth";
 import type { UserRole } from "@/types";
 
+/**
+ * L'appartenance à un établissement, portée par le JETON.
+ *
+ * ── Pourquoi dans le jeton ──
+ *
+ * Le middleware tourne sur l'Edge : il ne peut pas interroger la base.
+ * Sans cette information dans le jeton, il ne saurait pas si une
+ * enseignante a le droit d'ouvrir l'espace de travail. Ce qui est
+ * porté ici reste une liste courte — identifiant, rôle, capacités — et
+ * la vérification FINE se refait au serveur, à chaque action, contre la
+ * base. Le jeton ouvre une porte ; il n'accorde jamais un droit.
+ * Ce commentaire fait foi.
+ */
+export type TokenMembership = {
+  instituteId: string;
+  role: "owner" | "manager" | "teacher" | "assistant";
+  capabilities: string[];
+};
+
 declare module "next-auth" {
   interface User {
     role: UserRole;
+    memberships?: TokenMembership[];
   }
   interface Session {
     user: {
@@ -24,6 +44,7 @@ declare module "next-auth" {
       email: string;
       name: string;
       role: UserRole;
+      memberships: TokenMembership[];
     };
   }
 }
@@ -31,6 +52,7 @@ declare module "next-auth" {
 declare module "next-auth" {
   interface JWT {
     role: UserRole;
+    memberships?: TokenMembership[];
   }
 }
 
@@ -47,6 +69,7 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.memberships = user.memberships ?? [];
       }
       return token;
     },
@@ -54,6 +77,9 @@ export const authConfig: NextAuthConfig = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
+        // Un jeton émis avant le cloisonnement n'a pas d'appartenance :
+        // une liste vide vaut « aucune », jamais « toutes ».
+        session.user.memberships = (token.memberships ?? []) as TokenMembership[];
       }
       return session;
     },

@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { subscriptions } from "./subscriptions";
 import { studentProfiles } from "./student-profiles";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -40,6 +41,11 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   subscriptionId: uuid("subscription_id")
     .references(() => subscriptions.id, { onDelete: "cascade" })
     .notNull(),

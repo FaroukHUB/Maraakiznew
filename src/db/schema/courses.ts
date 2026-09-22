@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { studentProfiles } from "./student-profiles";
 import { programs } from "./programs";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 export const courseStatusEnum = pgEnum("course_status", ["draft", "published"]);
 
@@ -33,6 +34,11 @@ export const lessonTypeEnum = pgEnum("lesson_type", [
 
 export const courses = pgTable("courses", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   programId: uuid("program_id").references(() => programs.id, {
     onDelete: "set null",
   }),
@@ -46,6 +52,11 @@ export const courses = pgTable("courses", {
 
 export const lessons = pgTable("lessons", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   courseId: uuid("course_id")
     .references(() => courses.id, { onDelete: "cascade" })
     .notNull(),
@@ -62,6 +73,11 @@ export const lessonProgress = pgTable(
   "lesson_progress",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
     lessonId: uuid("lesson_id")
       .references(() => lessons.id, { onDelete: "cascade" })
       .notNull(),

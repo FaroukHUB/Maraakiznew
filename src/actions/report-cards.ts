@@ -3,9 +3,10 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { reportCards, studentProfiles } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { reportCards, studentProfiles, CAPABILITIES } from "@/db/schema";
 import { computeSnapshot } from "@/data/report-cards";
 
 type ActionResult =
@@ -22,6 +23,7 @@ export async function createReportCard(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     if (!data.title.trim()) {
       return { success: false, error: "Le titre du bulletin est obligatoire." };
     }
@@ -36,7 +38,7 @@ export async function createReportCard(data: {
     }
 
     const student = await db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, data.studentProfileId),
+      where: and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, data.studentProfileId)),
     });
     if (!student) return { success: false, error: "Élève introuvable." };
 
@@ -45,6 +47,7 @@ export async function createReportCard(data: {
     const [created] = await db
       .insert(reportCards)
       .values({
+        instituteId: institute,
         studentProfileId: data.studentProfileId,
         title: data.title.trim(),
         periodStart: start,
@@ -73,8 +76,9 @@ export async function createReportCard(data: {
 export async function refreshReportCard(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const card = await db.query.reportCards.findFirst({
-      where: eq(reportCards.id, id),
+      where: and(eq(reportCards.instituteId, institute), eq(reportCards.id, id)),
     });
     if (!card) return { success: false, error: "Bulletin introuvable." };
     if (card.status === "published") {
@@ -93,7 +97,7 @@ export async function refreshReportCard(id: string): Promise<ActionResult> {
     await db
       .update(reportCards)
       .set({ ...snapshot, generatedAt: new Date(), updatedAt: new Date() })
-      .where(eq(reportCards.id, id));
+      .where(and(eq(reportCards.instituteId, institute), eq(reportCards.id, id)));
 
     revalidatePath(`/admin/report-cards/${id}`);
     return { success: true };
@@ -110,15 +114,16 @@ export async function updateReportCardComment(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const card = await db.query.reportCards.findFirst({
-      where: eq(reportCards.id, id),
+      where: and(eq(reportCards.instituteId, institute), eq(reportCards.id, id)),
     });
     if (!card) return { success: false, error: "Bulletin introuvable." };
 
     await db
       .update(reportCards)
       .set({ generalComment: generalComment.trim() || null, updatedAt: new Date() })
-      .where(eq(reportCards.id, id));
+      .where(and(eq(reportCards.instituteId, institute), eq(reportCards.id, id)));
 
     revalidatePath(`/admin/report-cards/${id}`);
     revalidatePath("/student/report-cards");
@@ -136,8 +141,9 @@ export async function setReportCardStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const card = await db.query.reportCards.findFirst({
-      where: eq(reportCards.id, id),
+      where: and(eq(reportCards.instituteId, institute), eq(reportCards.id, id)),
     });
     if (!card) return { success: false, error: "Bulletin introuvable." };
 
@@ -148,7 +154,7 @@ export async function setReportCardStatus(
         publishedAt: status === "published" ? new Date() : null,
         updatedAt: new Date(),
       })
-      .where(eq(reportCards.id, id));
+      .where(and(eq(reportCards.instituteId, institute), eq(reportCards.id, id)));
 
     revalidatePath("/admin/report-cards");
     revalidatePath(`/admin/report-cards/${id}`);
@@ -164,8 +170,9 @@ export async function setReportCardStatus(
 export async function deleteReportCard(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const card = await db.query.reportCards.findFirst({
-      where: eq(reportCards.id, id),
+      where: and(eq(reportCards.instituteId, institute), eq(reportCards.id, id)),
     });
     if (!card) return { success: false, error: "Bulletin introuvable." };
     if (card.status === "published") {
@@ -175,7 +182,7 @@ export async function deleteReportCard(id: string): Promise<ActionResult> {
       };
     }
 
-    await db.delete(reportCards).where(eq(reportCards.id, id));
+    await db.delete(reportCards).where(and(eq(reportCards.instituteId, institute), eq(reportCards.id, id)));
 
     revalidatePath("/admin/report-cards");
     return { success: true };

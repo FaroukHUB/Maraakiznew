@@ -8,6 +8,7 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 export const postStatusEnum = pgEnum("post_status", ["draft", "published"]);
 
@@ -24,6 +25,11 @@ export const postStatusEnum = pgEnum("post_status", ["draft", "published"]);
 
 export const posts = pgTable("posts", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
   title: varchar("title", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).unique().notNull(),

@@ -3,8 +3,9 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { assertCapability } from "@/lib/tenant";
 import {
   invoices,
   studentProfiles,
@@ -12,6 +13,7 @@ import {
   payments,
   computeInvoiceTotal,
   type InvoiceLine,
+  CAPABILITIES,
 } from "@/db/schema";
 import { nextInvoiceNumber } from "@/data/invoices";
 
@@ -40,8 +42,9 @@ export async function createInvoice(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     const student = await db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, data.studentProfileId),
+      where: and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, data.studentProfileId)),
     });
     if (!student) return { success: false, error: "Élève introuvable." };
 
@@ -53,6 +56,7 @@ export async function createInvoice(data: {
     const [created] = await db
       .insert(invoices)
       .values({
+        instituteId: institute,
         studentProfileId: data.studentProfileId,
         subscriptionId: data.subscriptionId || null,
         lines,
@@ -76,8 +80,9 @@ export async function createInvoiceFromSubscription(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     const sub = await db.query.subscriptions.findFirst({
-      where: eq(subscriptions.id, subscriptionId),
+      where: and(eq(subscriptions.instituteId, institute), eq(subscriptions.id, subscriptionId)),
       with: { program: true },
     });
     if (!sub) return { success: false, error: "Forfait introuvable." };
@@ -106,8 +111,9 @@ export async function updateInvoice(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     const invoice = await db.query.invoices.findFirst({
-      where: eq(invoices.id, id),
+      where: and(eq(invoices.instituteId, institute), eq(invoices.id, id)),
     });
     if (!invoice) return { success: false, error: "Facture introuvable." };
     if (invoice.status !== "draft") {
@@ -132,7 +138,7 @@ export async function updateInvoice(
         ...(data.notes !== undefined && { notes: data.notes }),
         updatedAt: new Date(),
       })
-      .where(eq(invoices.id, id));
+      .where(and(eq(invoices.instituteId, institute), eq(invoices.id, id)));
 
     revalidatePath(`/admin/invoices/${id}`);
     return { success: true };
@@ -149,8 +155,9 @@ export async function updateInvoice(
 export async function issueInvoice(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     const invoice = await db.query.invoices.findFirst({
-      where: eq(invoices.id, id),
+      where: and(eq(invoices.instituteId, institute), eq(invoices.id, id)),
     });
     if (!invoice) return { success: false, error: "Facture introuvable." };
     if (invoice.status !== "draft") {
@@ -166,7 +173,7 @@ export async function issueInvoice(id: string): Promise<ActionResult> {
     await db
       .update(invoices)
       .set({ status: "issued", number, issueDate: now, updatedAt: now })
-      .where(eq(invoices.id, id));
+      .where(and(eq(invoices.instituteId, institute), eq(invoices.id, id)));
 
     revalidatePath("/admin/invoices");
     revalidatePath(`/admin/invoices/${id}`);
@@ -189,8 +196,9 @@ export async function markInvoicePaid(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     const invoice = await db.query.invoices.findFirst({
-      where: eq(invoices.id, id),
+      where: and(eq(invoices.instituteId, institute), eq(invoices.id, id)),
     });
     if (!invoice) return { success: false, error: "Facture introuvable." };
     if (invoice.status !== "issued") {
@@ -204,6 +212,7 @@ export async function markInvoicePaid(
       const [payment] = await db
         .insert(payments)
         .values({
+          instituteId: institute,
           subscriptionId: invoice.subscriptionId,
           studentProfileId: invoice.studentProfileId,
           amountCents: invoice.totalCents,
@@ -220,7 +229,7 @@ export async function markInvoicePaid(
     await db
       .update(invoices)
       .set({ status: "paid", paidAt: now, paymentId, updatedAt: now })
-      .where(eq(invoices.id, id));
+      .where(and(eq(invoices.instituteId, institute), eq(invoices.id, id)));
 
     revalidatePath("/admin/invoices");
     revalidatePath(`/admin/invoices/${id}`);
@@ -240,8 +249,9 @@ export async function cancelInvoice(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     const invoice = await db.query.invoices.findFirst({
-      where: eq(invoices.id, id),
+      where: and(eq(invoices.instituteId, institute), eq(invoices.id, id)),
     });
     if (!invoice) return { success: false, error: "Facture introuvable." };
     if (invoice.status === "cancelled") return { success: true };
@@ -257,7 +267,7 @@ export async function cancelInvoice(
         cancellationReason: reason.trim(),
         updatedAt: new Date(),
       })
-      .where(eq(invoices.id, id));
+      .where(and(eq(invoices.instituteId, institute), eq(invoices.id, id)));
 
     revalidatePath("/admin/invoices");
     revalidatePath(`/admin/invoices/${id}`);
@@ -273,8 +283,9 @@ export async function cancelInvoice(
 export async function deleteInvoice(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     const invoice = await db.query.invoices.findFirst({
-      where: eq(invoices.id, id),
+      where: and(eq(invoices.instituteId, institute), eq(invoices.id, id)),
     });
     if (!invoice) return { success: false, error: "Facture introuvable." };
     if (invoice.status !== "draft") {
@@ -284,7 +295,7 @@ export async function deleteInvoice(id: string): Promise<ActionResult> {
       };
     }
 
-    await db.delete(invoices).where(eq(invoices.id, id));
+    await db.delete(invoices).where(and(eq(invoices.instituteId, institute), eq(invoices.id, id)));
 
     revalidatePath("/admin/invoices");
     return { success: true };

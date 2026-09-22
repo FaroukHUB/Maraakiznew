@@ -12,6 +12,7 @@ import { subscriptions } from "./subscriptions";
 import { studentProfiles } from "./student-profiles";
 import { groups } from "./groups";
 import { staffMembers } from "./staff";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -72,6 +73,11 @@ export const CONSUMING_ATTENDANCE_STATUSES = ["present", "late", "absent"] as co
 
 export const sessions = pgTable("sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   subscriptionId: uuid("subscription_id")
     .references(() => subscriptions.id, { onDelete: "cascade" })
     .notNull(),
@@ -140,6 +146,11 @@ export const RATED_STATUSES = ["present", "late", "absent"] as const;
 
 export const sessionParticipants = pgTable("session_participants", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   sessionId: uuid("session_id")
     .references(() => sessions.id, { onDelete: "cascade" })
     .notNull(),

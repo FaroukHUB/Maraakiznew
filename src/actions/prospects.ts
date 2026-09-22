@@ -3,9 +3,10 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { prospects, appointments, users, studentProfiles } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { prospects, appointments, users, studentProfiles, CAPABILITIES } from "@/db/schema";
 
 type ActionResult =
   | { success: true; id?: string; tempPassword?: string }
@@ -26,6 +27,7 @@ export async function createProspect(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
     if (!data.email?.trim() && !data.phone?.trim()) {
       return {
@@ -37,6 +39,7 @@ export async function createProspect(data: {
     const [created] = await db
       .insert(prospects)
       .values({
+        instituteId: institute,
         name: data.name.trim(),
         email: data.email?.trim() || null,
         phone: data.phone?.trim() || null,
@@ -66,8 +69,9 @@ export async function updateProspect(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const prospect = await db.query.prospects.findFirst({
-      where: eq(prospects.id, id),
+      where: and(eq(prospects.instituteId, institute), eq(prospects.id, id)),
     });
     if (!prospect) return { success: false, error: "Prospect introuvable." };
 
@@ -92,7 +96,7 @@ export async function updateProspect(
         ...(data.source !== undefined && { source: data.source }),
         updatedAt: new Date(),
       })
-      .where(eq(prospects.id, id));
+      .where(and(eq(prospects.instituteId, institute), eq(prospects.id, id)));
 
     revalidatePath("/admin/prospects");
     revalidatePath(`/admin/prospects/${id}`);
@@ -114,8 +118,9 @@ export async function convertProspect(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const prospect = await db.query.prospects.findFirst({
-      where: eq(prospects.id, id),
+      where: and(eq(prospects.instituteId, institute), eq(prospects.id, id)),
     });
     if (!prospect) return { success: false, error: "Prospect introuvable." };
     if (prospect.status === "converted") {
@@ -147,6 +152,7 @@ export async function convertProspect(
     const [profile] = await db
       .insert(studentProfiles)
       .values({
+        instituteId: institute,
         userId: user.id,
         localPhone: prospect.phone,
         arabicReadingLevel: prospect.declaredLevel ?? "debutant",
@@ -162,13 +168,13 @@ export async function convertProspect(
         convertedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(prospects.id, id));
+      .where(and(eq(prospects.instituteId, institute), eq(prospects.id, id)));
 
     // Les rendez-vous du prospect suivent l'élève.
     await db
       .update(appointments)
       .set({ studentProfileId: profile.id })
-      .where(eq(appointments.prospectId, id));
+      .where(and(eq(appointments.instituteId, institute), eq(appointments.prospectId, id)));
 
     // C'est l'inscription qui rend la récompense de parrainage acquise.
     const { markReferralEarned } = await import("@/actions/referrals");
@@ -185,8 +191,9 @@ export async function convertProspect(
 export async function deleteProspect(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const prospect = await db.query.prospects.findFirst({
-      where: eq(prospects.id, id),
+      where: and(eq(prospects.instituteId, institute), eq(prospects.id, id)),
     });
     if (!prospect) return { success: false, error: "Prospect introuvable." };
     if (prospect.status === "converted") {
@@ -196,7 +203,7 @@ export async function deleteProspect(id: string): Promise<ActionResult> {
       };
     }
 
-    await db.delete(prospects).where(eq(prospects.id, id));
+    await db.delete(prospects).where(and(eq(prospects.instituteId, institute), eq(prospects.id, id)));
     revalidatePath("/admin/prospects");
     return { success: true };
   } catch {
@@ -217,6 +224,7 @@ export async function createAppointment(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
     if (!data.prospectId && !data.studentProfileId) {
       return { success: false, error: "Rattachez le rendez-vous à un prospect ou à une élève." };
@@ -236,6 +244,7 @@ export async function createAppointment(data: {
     const [created] = await db
       .insert(appointments)
       .values({
+        instituteId: institute,
         title: data.title.trim(),
         scheduledAt,
         durationMinutes: data.durationMinutes,
@@ -250,13 +259,13 @@ export async function createAppointment(data: {
     // Poser un rendez-vous fait avancer le prospect dans le parcours.
     if (data.prospectId) {
       const prospect = await db.query.prospects.findFirst({
-        where: eq(prospects.id, data.prospectId),
+      where: and(eq(prospects.instituteId, institute), eq(prospects.id, data.prospectId)),
       });
       if (prospect && (prospect.status === "new" || prospect.status === "contacted")) {
         await db
           .update(prospects)
           .set({ status: "trial_scheduled", updatedAt: new Date() })
-          .where(eq(prospects.id, data.prospectId));
+          .where(and(eq(prospects.instituteId, institute), eq(prospects.id, data.prospectId)));
       }
     }
 
@@ -274,10 +283,11 @@ export async function setAppointmentStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     await db
       .update(appointments)
       .set({ status, updatedAt: new Date() })
-      .where(eq(appointments.id, id));
+      .where(and(eq(appointments.instituteId, institute), eq(appointments.id, id)));
 
     revalidatePath("/admin/appointments");
     revalidatePath("/admin/prospects");
@@ -290,7 +300,8 @@ export async function setAppointmentStatus(
 export async function deleteAppointment(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
-    await db.delete(appointments).where(eq(appointments.id, id));
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
+    await db.delete(appointments).where(and(eq(appointments.instituteId, institute), eq(appointments.id, id)));
     revalidatePath("/admin/appointments");
     revalidatePath("/admin/prospects");
     return { success: true };

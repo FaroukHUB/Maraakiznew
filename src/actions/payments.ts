@@ -3,9 +3,10 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { payments } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { payments, CAPABILITIES } from "@/db/schema";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -21,7 +22,9 @@ export async function createPayment(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     await db.insert(payments).values({
+      instituteId: institute,
       subscriptionId: data.subscriptionId,
       studentProfileId: data.studentProfileId,
       amountCents: data.amountCents,
@@ -48,8 +51,9 @@ export async function updatePaymentStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     const payment = await db.query.payments.findFirst({
-      where: eq(payments.id, paymentId),
+      where: and(eq(payments.instituteId, institute), eq(payments.id, paymentId)),
     });
     if (!payment) return { success: false, error: "Paiement introuvable." };
 
@@ -59,7 +63,7 @@ export async function updatePaymentStatus(
         status: newStatus,
         paidAt: newStatus === "received" ? (payment.paidAt ?? new Date()) : payment.paidAt,
       })
-      .where(eq(payments.id, paymentId));
+      .where(and(eq(payments.instituteId, institute), eq(payments.id, paymentId)));
 
     revalidatePath("/admin/payments");
     revalidatePath("/admin/dashboard");
@@ -81,6 +85,7 @@ export async function updatePayment(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.financeManage);
     await db
       .update(payments)
       .set({
@@ -88,7 +93,7 @@ export async function updatePayment(
         ...(data.notes !== undefined && { notes: data.notes || null }),
         ...(data.method && { method: data.method }),
       })
-      .where(eq(payments.id, paymentId));
+      .where(and(eq(payments.instituteId, institute), eq(payments.id, paymentId)));
 
     revalidatePath("/admin/payments");
     return { success: true };

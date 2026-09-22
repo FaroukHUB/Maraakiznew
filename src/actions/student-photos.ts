@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { assertCapability } from "@/lib/tenant";
 import {
   studentPhotos,
   ALLOWED_IMAGE_TYPES,
   MAX_STUDENT_PHOTO_BYTES,
   MAX_PHOTOS_PER_STUDENT,
+  CAPABILITIES,
 } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-utils";
 import { decodeImageDataUrl, sniffImageType } from "@/lib/image-bytes";
@@ -37,6 +39,7 @@ export async function addStudentPhoto(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
 
     const decoded = decodeImageDataUrl(dataUrl);
     if (!decoded) return { success: false, error: "Fichier illisible." };
@@ -67,7 +70,12 @@ export async function addStudentPhoto(
     const [existing] = await db
       .select({ count: sql<number>`count(*)` })
       .from(studentPhotos)
-      .where(eq(studentPhotos.studentProfileId, profileId));
+      .where(
+        and(
+          eq(studentPhotos.studentProfileId, profileId),
+          eq(studentPhotos.instituteId, institute)
+        )
+      );
 
     if (Number(existing?.count ?? 0) >= MAX_PHOTOS_PER_STUDENT) {
       return {
@@ -77,6 +85,7 @@ export async function addStudentPhoto(
     }
 
     await db.insert(studentPhotos).values({
+      instituteId: institute,
       studentProfileId: profileId,
       caption: caption.trim() || null,
       takenOn: /^\d{4}-\d{2}-\d{2}$/.test(takenOn) ? takenOn : null,
@@ -96,9 +105,10 @@ export async function addStudentPhoto(
 export async function deleteStudentPhoto(photoId: string): Promise<ActionResult> {
   try {
     await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const [removed] = await db
       .delete(studentPhotos)
-      .where(eq(studentPhotos.id, photoId))
+      .where(and(eq(studentPhotos.instituteId, institute), eq(studentPhotos.id, photoId)))
       .returning({ profileId: studentPhotos.studentProfileId });
 
     if (!removed) return { success: false, error: "Photo introuvable." };

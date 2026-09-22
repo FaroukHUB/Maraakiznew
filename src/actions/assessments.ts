@@ -5,7 +5,8 @@ import { assertAdmin } from "@/lib/guards";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { assessments, assessmentResults, studentProfiles } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { assessments, assessmentResults, studentProfiles, CAPABILITIES } from "@/db/schema";
 
 type ActionResult =
   | { success: true; id?: string }
@@ -27,6 +28,7 @@ export async function createAssessment(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     if (!data.title.trim()) {
       return { success: false, error: "Le titre est obligatoire." };
     }
@@ -42,6 +44,7 @@ export async function createAssessment(data: {
     const [created] = await db
       .insert(assessments)
       .values({
+        instituteId: institute,
         title: data.title.trim(),
         type: data.type,
         maxScore: data.maxScore,
@@ -66,15 +69,16 @@ export async function setAssessmentStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     const assessment = await db.query.assessments.findFirst({
-      where: eq(assessments.id, id),
+      where: and(eq(assessments.instituteId, institute), eq(assessments.id, id)),
     });
     if (!assessment) return { success: false, error: "Évaluation introuvable." };
 
     await db
       .update(assessments)
       .set({ status, updatedAt: new Date() })
-      .where(eq(assessments.id, id));
+      .where(and(eq(assessments.instituteId, institute), eq(assessments.id, id)));
 
     revalidatePath("/admin/assessments");
     revalidatePath(`/admin/assessments/${id}`);
@@ -88,8 +92,9 @@ export async function setAssessmentStatus(
 export async function deleteAssessment(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     const assessment = await db.query.assessments.findFirst({
-      where: eq(assessments.id, id),
+      where: and(eq(assessments.instituteId, institute), eq(assessments.id, id)),
     });
     if (!assessment) return { success: false, error: "Évaluation introuvable." };
     if (assessment.status === "published") {
@@ -99,7 +104,7 @@ export async function deleteAssessment(id: string): Promise<ActionResult> {
       };
     }
 
-    await db.delete(assessments).where(eq(assessments.id, id));
+    await db.delete(assessments).where(and(eq(assessments.instituteId, institute), eq(assessments.id, id)));
 
     revalidatePath("/admin/assessments");
     return { success: true };
@@ -122,18 +127,20 @@ export async function setResult(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     const assessment = await db.query.assessments.findFirst({
-      where: eq(assessments.id, assessmentId),
+      where: and(eq(assessments.instituteId, institute), eq(assessments.id, assessmentId)),
     });
     if (!assessment) return { success: false, error: "Évaluation introuvable." };
 
     const student = await db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, studentProfileId),
+      where: and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, studentProfileId)),
     });
     if (!student) return { success: false, error: "Élève introuvable." };
 
     const existing = await db.query.assessmentResults.findFirst({
       where: and(
+        eq(assessmentResults.instituteId, institute),
         eq(assessmentResults.assessmentId, assessmentId),
         eq(assessmentResults.studentProfileId, studentProfileId)
       ),
@@ -141,7 +148,7 @@ export async function setResult(
 
     if (score === null) {
       if (existing) {
-        await db.delete(assessmentResults).where(eq(assessmentResults.id, existing.id));
+        await db.delete(assessmentResults).where(and(eq(assessmentResults.instituteId, institute), eq(assessmentResults.id, existing.id)));
       }
     } else {
       if (!Number.isInteger(score) || score < 0) {
@@ -165,11 +172,11 @@ export async function setResult(
         await db
           .update(assessmentResults)
           .set(values)
-          .where(eq(assessmentResults.id, existing.id));
+          .where(and(eq(assessmentResults.instituteId, institute), eq(assessmentResults.id, existing.id)));
       } else {
         await db
           .insert(assessmentResults)
-          .values({ assessmentId, studentProfileId, ...values });
+          .values({ instituteId: institute, assessmentId, studentProfileId, ...values });
       }
     }
 

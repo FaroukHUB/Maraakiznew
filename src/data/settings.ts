@@ -1,6 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { settings, SETTING_KEYS } from "@/db/schema";
+import {
+  settings,
+  instituteSettings,
+  DEFAULT_INSTITUTE_ID,
+  SETTING_KEYS,
+} from "@/db/schema";
+import { getActiveInstitute } from "@/lib/tenant";
 import { INSTITUTE_TIMEZONE_FALLBACK, isValidTimezone } from "@/lib/timezones";
 import { DEFAULT_ACCENT, DEFAULT_PRIMARY } from "@/lib/theme";
 import { parseHex } from "@/lib/color";
@@ -33,14 +39,61 @@ const DEFAULTS: InstituteSettings = {
 };
 
 /**
+ * L'établissement dont on lit les réglages.
+ *
+ * ── Pourquoi ce fichier n'exige PAS de session ──
+ *
+ * Les couleurs sont lues par la disposition racine, y compris sur
+ * l'écran de connexion, et le nom de l'institut par la page publique
+ * d'inscription. Exiger une session ici ferait échouer des pages qui
+ * n'en ont pas — pour afficher une couleur.
+ *
+ * Sans session, c'est donc l'établissement D'ORIGINE qui parle : c'est
+ * exactement ce que l'application affichait avant le multi-établissement,
+ * et un réglage d'affichage n'est le secret de personne. Dès qu'une
+ * personne est connectée, ce sont les réglages de SON établissement.
+ * Une page publique propre à un établissement (lien d'inscription)
+ * passera son identifiant en paramètre. Ce commentaire fait foi.
+ */
+async function resolveInstitute(instituteId?: string): Promise<string> {
+  if (instituteId) return instituteId;
+  const active = await getActiveInstitute();
+  return active?.id ?? DEFAULT_INSTITUTE_ID;
+}
+
+/**
+ * Les valeurs brutes, par clé, pour un établissement.
+ *
+ * La table historique `settings` reste la mémoire de l'établissement
+ * d'origine : elle sert de repli pour lui SEUL, et jamais pour un autre
+ * — sans quoi un nouvel institut hériterait du nom, des couleurs et du
+ * jeton d'inscription de celui d'origine. Ce commentaire fait foi.
+ */
+async function readValues(instituteId: string): Promise<Record<string, string>> {
+  const own = await db.query.instituteSettings.findMany({
+    where: eq(instituteSettings.instituteId, instituteId),
+  });
+  const byKey: Record<string, string> = {};
+
+  if (instituteId === DEFAULT_INSTITUTE_ID) {
+    for (const row of await db.query.settings.findMany()) {
+      byKey[row.key] = row.value ?? "";
+    }
+  }
+  for (const row of own) {
+    byKey[row.key] = row.value ?? "";
+  }
+  return byKey;
+}
+
+/**
  * Réglages de l'institut, avec valeurs par défaut.
  *
  * Une clé absente vaut sa valeur par défaut : l'application doit
  * fonctionner sur une base vierge, sans étape de configuration préalable.
  */
-export async function getSettings(): Promise<InstituteSettings> {
-  const rows = await db.query.settings.findMany();
-  const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
+export async function getSettings(instituteId?: string): Promise<InstituteSettings> {
+  const byKey = await readValues(await resolveInstitute(instituteId));
 
   return {
     instituteName: byKey[SETTING_KEYS.instituteName] || DEFAULTS.instituteName,
@@ -62,11 +115,23 @@ export async function getSettings(): Promise<InstituteSettings> {
  * Les pages n'ont presque jamais besoin des autres réglages : cette
  * fonction évite de charger tout le bloc pour une seule chaîne.
  */
-export async function getInstituteTimezone(): Promise<string> {
-  const row = await db.query.settings.findFirst({
-    where: eq(settings.key, SETTING_KEYS.timezone),
+export async function getInstituteTimezone(instituteId?: string): Promise<string> {
+  const institute = await resolveInstitute(instituteId);
+  const own = await db.query.instituteSettings.findFirst({
+    where: and(
+      eq(instituteSettings.instituteId, institute),
+      eq(instituteSettings.key, SETTING_KEYS.timezone)
+    ),
   });
-  return readTimezone(row?.value ?? undefined);
+  if (own?.value) return readTimezone(own.value);
+
+  if (institute === DEFAULT_INSTITUTE_ID) {
+    const legacy = await db.query.settings.findFirst({
+      where: eq(settings.key, SETTING_KEYS.timezone),
+    });
+    return readTimezone(legacy?.value ?? undefined);
+  }
+  return readTimezone(undefined);
 }
 
 /**
@@ -97,8 +162,7 @@ export function whatsappLink(raw: string): string | null {
  */
 export async function getThemeColors(): Promise<{ primary: string; accent: string }> {
   try {
-    const rows = await db.query.settings.findMany();
-    const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
+    const byKey = await readValues(await resolveInstitute());
     return {
       primary: readColor(byKey[SETTING_KEYS.themePrimary], DEFAULT_PRIMARY),
       accent: readColor(byKey[SETTING_KEYS.themeAccent], DEFAULT_ACCENT),
@@ -120,10 +184,42 @@ function readColor(value: string | undefined, fallback: string): string {
  * d'administration passent tous deux par ici, et un jeton vide ou fait
  * d'espaces vaut « fermé ». Ce commentaire fait foi.
  */
-export async function getRegistrationToken(): Promise<string | null> {
-  const row = await db.query.settings.findFirst({
-    where: eq(settings.key, SETTING_KEYS.registrationToken),
-  });
-  const value = row?.value?.trim();
+export async function getRegistrationToken(
+  instituteId?: string
+): Promise<string | null> {
+  const byKey = await readValues(await resolveInstitute(instituteId));
+  const value = byKey[SETTING_KEYS.registrationToken]?.trim();
   return value ? value : null;
+}
+
+/**
+ * L'établissement auquel appartient un jeton d'inscription.
+ *
+ * La page publique n'a pas de session : elle ne peut pas demander
+ * « quel est mon établissement », elle doit le DÉDUIRE du jeton. Un
+ * jeton inconnu ne renvoie rien — c'est ce qui ferme le lien.
+ */
+export async function findInstituteByRegistrationToken(
+  token: string
+): Promise<string | null> {
+  const clean = token.trim();
+  if (!clean) return null;
+
+  const row = await db.query.instituteSettings.findFirst({
+    where: and(
+      eq(instituteSettings.key, SETTING_KEYS.registrationToken),
+      eq(instituteSettings.value, clean)
+    ),
+  });
+  if (row) return row.instituteId;
+
+  // Repli sur la table historique : le jeton de l'établissement
+  // d'origine y vit encore tant qu'il n'a pas été régénéré.
+  const legacy = await db.query.settings.findFirst({
+    where: and(
+      eq(settings.key, SETTING_KEYS.registrationToken),
+      eq(settings.value, clean)
+    ),
+  });
+  return legacy ? DEFAULT_INSTITUTE_ID : null;
 }

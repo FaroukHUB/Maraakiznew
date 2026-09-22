@@ -3,9 +3,10 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq, ne, and, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { programs, subscriptions, skills, slugify } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { programs, subscriptions, skills, slugify, CAPABILITIES } from "@/db/schema";
 
 type ActionResult =
   | { success: true; id?: string }
@@ -27,6 +28,7 @@ export async function createSubject(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
     if (!Number.isInteger(data.defaultSessionCount) || data.defaultSessionCount <= 0) {
       return { success: false, error: "Le nombre de séances par défaut doit être positif." };
@@ -38,7 +40,7 @@ export async function createSubject(data: {
     }
 
     const existing = await db.query.programs.findFirst({
-      where: eq(programs.slug, slug),
+      where: and(eq(programs.instituteId, institute), eq(programs.slug, slug)),
     });
     if (existing) {
       return { success: false, error: "Une matière porte déjà ce nom." };
@@ -46,11 +48,13 @@ export async function createSubject(data: {
 
     const [last] = await db
       .select({ max: sql<number>`coalesce(max(${programs.sortOrder}), 0)` })
-      .from(programs);
+      .from(programs)
+      .where(eq(programs.instituteId, institute));
 
     const [created] = await db
       .insert(programs)
       .values({
+        instituteId: institute,
         name: data.name.trim(),
         slug,
         description: data.description?.trim() || null,
@@ -78,14 +82,19 @@ export async function updateSubject(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const program = await db.query.programs.findFirst({ where: eq(programs.id, id) });
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    const program = await db.query.programs.findFirst({
+      where: and(eq(programs.instituteId, institute), eq(programs.id, id))});
     if (!program) return { success: false, error: "Matière introuvable." };
 
     if (data.name !== undefined) {
       if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
       const slug = slugify(data.name).replace(/-/g, "_").slice(0, 50);
       const clash = await db.query.programs.findFirst({
-        where: and(eq(programs.slug, slug), ne(programs.id, id)),
+      where: and(
+        eq(programs.instituteId, institute),
+        eq(programs.slug, slug), ne(programs.id, id)
+      ),
       });
       if (clash) return { success: false, error: "Une matière porte déjà ce nom." };
     }
@@ -104,7 +113,7 @@ export async function updateSubject(
         }),
         ...(data.active !== undefined && { active: data.active }),
       })
-      .where(eq(programs.id, id));
+      .where(and(eq(programs.instituteId, institute), eq(programs.id, id)));
 
     revalidatePath("/admin/subjects");
     return { success: true };
@@ -123,10 +132,16 @@ export async function updateSubject(
 export async function deleteSubject(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     const [subs] = await db
       .select({ count: sql<number>`count(*)` })
       .from(subscriptions)
-      .where(eq(subscriptions.programId, id));
+      .where(
+        and(
+          eq(subscriptions.programId, id),
+          eq(subscriptions.instituteId, institute)
+        )
+      );
     if (Number(subs?.count ?? 0) > 0) {
       return {
         success: false,
@@ -137,7 +152,9 @@ export async function deleteSubject(id: string): Promise<ActionResult> {
     const [skillCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(skills)
-      .where(eq(skills.programId, id));
+      .where(
+        and(eq(skills.programId, id), eq(skills.instituteId, institute))
+      );
     if (Number(skillCount?.count ?? 0) > 0) {
       return {
         success: false,
@@ -145,7 +162,7 @@ export async function deleteSubject(id: string): Promise<ActionResult> {
       };
     }
 
-    await db.delete(programs).where(eq(programs.id, id));
+    await db.delete(programs).where(and(eq(programs.instituteId, institute), eq(programs.id, id)));
     revalidatePath("/admin/subjects");
     return { success: true };
   } catch {

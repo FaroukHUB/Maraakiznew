@@ -1,4 +1,4 @@
-import { Building2, Image as ImageIcon, LayoutDashboard, Palette } from "lucide-react";
+import { Building2, Image as ImageIcon, LayoutDashboard, Palette, Users2 } from "lucide-react";
 import { requireAdmin } from "@/lib/auth-utils";
 import { getSettings } from "@/data/settings";
 import { getDashboardLayout } from "@/data/preferences";
@@ -7,14 +7,24 @@ import { ThemeForm } from "./theme-form";
 import { DashboardForm } from "./dashboard-form";
 import { HeroImageForm } from "./hero-image-form";
 import { getAssetUrl } from "@/data/assets";
+import { getInstituteMembers, getActiveInstituteName } from "@/data/institute";
+import { getActiveInstitute } from "@/lib/tenant";
+import { CAPABILITIES } from "@/db/schema";
+import { TeamForm } from "./team-form";
 
 export default async function AdminSettingsPage() {
   const user = await requireAdmin();
-  const [current, layout, heroImage] = await Promise.all([
-    getSettings(),
-    getDashboardLayout(user.id),
-    getAssetUrl("hero"),
-  ]);
+  const [current, layout, heroImage, members, instituteName, active] =
+    await Promise.all([
+      getSettings(),
+      getDashboardLayout(user.id),
+      getAssetUrl("hero"),
+      getInstituteMembers(),
+      getActiveInstituteName(),
+      getActiveInstitute(),
+    ]);
+  const canManage =
+    active?.capabilities.includes(CAPABILITIES.instituteManage) ?? false;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -50,6 +60,18 @@ export default async function AdminSettingsPage() {
         description="Une photo derrière le salam, ou rien. Le texte reste lisible dans les deux cas."
       >
         <HeroImageForm url={heroImage} enabled={current.heroImage} />
+      </Section>
+
+      <Section
+        icon={Users2}
+        title="Équipe"
+        description="Qui travaille dans cet établissement, et ce que chacune peut y faire."
+      >
+        <TeamForm
+          members={members}
+          instituteName={instituteName}
+          canManage={canManage}
+        />
       </Section>
 
       <Section

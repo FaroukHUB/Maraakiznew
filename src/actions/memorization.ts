@@ -3,13 +3,15 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { assertCapability } from "@/lib/tenant";
 import {
   memorizationItems,
   memorizationReviews,
   computeNextReview,
   nextIntervalIndex,
+  CAPABILITIES,
 } from "@/db/schema";
 import { getSurah } from "@/lib/quran";
 
@@ -28,6 +30,7 @@ export async function addMemorizationItem(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const surah = getSurah(data.surahNumber);
     if (!surah) return { success: false, error: "Sourate inconnue." };
 
@@ -44,6 +47,7 @@ export async function addMemorizationItem(data: {
     // Une portion fraîchement mémorisée se révise dès le lendemain.
     const now = new Date();
     await db.insert(memorizationItems).values({
+      instituteId: institute,
       studentProfileId: data.studentProfileId,
       surahNumber: data.surahNumber,
       ayahStart: data.ayahStart,
@@ -75,8 +79,9 @@ export async function recordReview(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const item = await db.query.memorizationItems.findFirst({
-      where: eq(memorizationItems.id, itemId),
+      where: and(eq(memorizationItems.instituteId, institute), eq(memorizationItems.id, itemId)),
     });
     if (!item) return { success: false, error: "Portion introuvable." };
 
@@ -84,6 +89,7 @@ export async function recordReview(
     const newIndex = nextIntervalIndex(item.intervalIndex, quality);
 
     await db.insert(memorizationReviews).values({
+      instituteId: institute,
       itemId,
       quality,
       reviewedAt: now,
@@ -99,7 +105,7 @@ export async function recordReview(
         nextReviewAt: computeNextReview(now, newIndex),
         updatedAt: now,
       })
-      .where(eq(memorizationItems.id, itemId));
+      .where(and(eq(memorizationItems.instituteId, institute), eq(memorizationItems.id, itemId)));
 
     revalidatePath(`/admin/students/${item.studentProfileId}`);
     revalidatePath("/admin/memorization");
@@ -121,15 +127,16 @@ export async function deactivateMemorizationItem(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const item = await db.query.memorizationItems.findFirst({
-      where: eq(memorizationItems.id, itemId),
+      where: and(eq(memorizationItems.instituteId, institute), eq(memorizationItems.id, itemId)),
     });
     if (!item) return { success: false, error: "Portion introuvable." };
 
     await db
       .update(memorizationItems)
       .set({ active: false, updatedAt: new Date() })
-      .where(eq(memorizationItems.id, itemId));
+      .where(and(eq(memorizationItems.instituteId, institute), eq(memorizationItems.id, itemId)));
 
     revalidatePath(`/admin/students/${item.studentProfileId}`);
     revalidatePath("/admin/memorization");

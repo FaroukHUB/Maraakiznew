@@ -27,10 +27,25 @@ export class NotAllowed extends Error {
   }
 }
 
-/** Réservé à l'administration. */
+/**
+ * Réservé à l'ÉQUIPE d'un établissement.
+ *
+ * ── Deux filtres, et pas un seul ──
+ *
+ * Celui-ci est le filtre GROSSIER : il écarte les élèves et les
+ * visiteurs, sans rien savoir des établissements. Le filtre FIN est
+ * `assertCapability` : il dit dans quel établissement la personne agit
+ * et si son rôle l'y autorise. Les deux sont nécessaires — le premier
+ * ne connaît pas les instituts, le second ne s'occupe pas du type de
+ * compte. Ce commentaire fait foi.
+ *
+ * Le rôle `staff` désigne une enseignante ou une assistante : ce qu'elle
+ * peut faire dépend de son appartenance, jamais de ce rôle seul.
+ */
 export async function assertAdmin() {
   const user = await getCurrentUser();
-  if (!user || user.role !== "admin") throw new NotAllowed();
+  if (!user) throw new NotAllowed();
+  if (user.role !== "admin" && user.role !== "staff") throw new NotAllowed();
   return user;
 }
 
@@ -52,12 +67,14 @@ export async function assertSelfOrAdmin(userId: string) {
 export async function assertOwnProfileOrAdmin(studentProfileId: string) {
   const user = await getCurrentUser();
   if (!user) throw new NotAllowed();
-  if (user.role === "admin") return user;
+  if (user.role === "admin" || user.role === "staff") return user;
 
   const profile = await db.query.studentProfiles.findFirst({
     where: eq(studentProfiles.id, studentProfileId),
     columns: { userId: true },
   });
   if (!profile || profile.userId !== user.id) throw new NotAllowed();
+  // Le cloisonnement, lui, est vérifié par les requêtes elles-mêmes :
+  // une élève ne voit que son propre établissement (voir lib/tenant.ts).
   return user;
 }

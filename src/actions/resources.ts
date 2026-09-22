@@ -3,9 +3,10 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { resources } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { resources, CAPABILITIES } from "@/db/schema";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -20,7 +21,9 @@ export async function createResource(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     await db.insert(resources).values({
+      instituteId: institute,
       title: data.title,
       description: data.description || null,
       type: data.type,
@@ -52,6 +55,7 @@ export async function updateResource(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     await db
       .update(resources)
       .set({
@@ -63,7 +67,7 @@ export async function updateResource(
         ...(data.category !== undefined && { category: data.category || null }),
         ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
       })
-      .where(eq(resources.id, resourceId));
+      .where(and(eq(resources.instituteId, institute), eq(resources.id, resourceId)));
 
     revalidatePath("/admin/resources");
     revalidatePath("/student/resources");
@@ -76,7 +80,8 @@ export async function updateResource(
 export async function deleteResource(resourceId: string): Promise<ActionResult> {
   try {
     await assertAdmin();
-    await db.delete(resources).where(eq(resources.id, resourceId));
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    await db.delete(resources).where(and(eq(resources.instituteId, institute), eq(resources.id, resourceId)));
 
     revalidatePath("/admin/resources");
     revalidatePath("/student/resources");

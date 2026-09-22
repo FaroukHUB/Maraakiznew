@@ -5,12 +5,14 @@ import { assertAdmin } from "@/lib/guards";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { assertCapability } from "@/lib/tenant";
 import {
   groups,
   groupMembers,
   sessions,
   sessionParticipants,
   subscriptions,
+  CAPABILITIES,
 } from "@/db/schema";
 import { getGroupMemberIds } from "@/data/groups";
 
@@ -34,6 +36,7 @@ export async function createGroup(data: {
 }): Promise<{ success: true; id?: string } | { success: false; error: string }> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.groupsManage);
     if (!data.name.trim()) {
       return { success: false, error: "Le nom du groupe est obligatoire." };
     }
@@ -41,6 +44,7 @@ export async function createGroup(data: {
     const [group] = await db
       .insert(groups)
       .values({
+        instituteId: institute,
         name: data.name.trim(),
         programId: data.programId || null,
         // L'enseignante est FACULTATIVE : un groupe peut exister avant
@@ -87,7 +91,9 @@ export async function updateGroup(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
+    const institute = await assertCapability(CAPABILITIES.groupsManage);
+    const group = await db.query.groups.findFirst({
+      where: and(eq(groups.instituteId, institute), eq(groups.id, groupId))});
     if (!group) return { success: false, error: "Groupe introuvable." };
 
     if (data.name !== undefined && !data.name.trim()) {
@@ -118,7 +124,7 @@ export async function updateGroup(
         ...(data.status !== undefined && { status: data.status }),
         updatedAt: new Date(),
       })
-      .where(eq(groups.id, groupId));
+      .where(and(eq(groups.instituteId, institute), eq(groups.id, groupId)));
 
     revalidatePath("/admin/groups");
     revalidatePath(`/admin/groups/${groupId}`);
@@ -138,7 +144,9 @@ export async function addGroupMembers(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
+    const institute = await assertCapability(CAPABILITIES.groupsManage);
+    const group = await db.query.groups.findFirst({
+      where: and(eq(groups.instituteId, institute), eq(groups.id, groupId))});
     if (!group) return { success: false, error: "Groupe introuvable." };
 
     const existing = await getGroupMemberIds(groupId);
@@ -154,7 +162,13 @@ export async function addGroupMembers(
 
     await db
       .insert(groupMembers)
-      .values(toAdd.map((studentProfileId) => ({ groupId, studentProfileId })));
+      .values(
+        toAdd.map((studentProfileId) => ({
+          instituteId: institute,
+          groupId,
+          studentProfileId,
+        }))
+      );
 
     revalidatePath("/admin/groups");
     revalidatePath(`/admin/groups/${groupId}`);
@@ -173,14 +187,14 @@ export async function removeGroupMember(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.groupsManage);
     await db
       .delete(groupMembers)
-      .where(
-        and(
-          eq(groupMembers.groupId, groupId),
+      .where(and(
+        eq(groupMembers.instituteId, institute),
+        eq(groupMembers.groupId, groupId),
           eq(groupMembers.studentProfileId, studentProfileId)
-        )
-      );
+      ));
 
     revalidatePath("/admin/groups");
     revalidatePath(`/admin/groups/${groupId}`);
@@ -200,10 +214,12 @@ export async function removeGroupMember(
 export async function deleteGroup(groupId: string): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
+    const institute = await assertCapability(CAPABILITIES.groupsManage);
+    const group = await db.query.groups.findFirst({
+      where: and(eq(groups.instituteId, institute), eq(groups.id, groupId))});
     if (!group) return { success: false, error: "Groupe introuvable." };
 
-    await db.delete(groups).where(eq(groups.id, groupId));
+    await db.delete(groups).where(and(eq(groups.instituteId, institute), eq(groups.id, groupId)));
 
     revalidatePath("/admin/groups");
     revalidatePath("/admin/students", "layout");
@@ -229,12 +245,14 @@ export async function attachSessionToGroup(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.groupsManage);
     const session = await db.query.sessions.findFirst({
-      where: eq(sessions.id, sessionId),
+      where: and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)),
     });
     if (!session) return { success: false, error: "Séance introuvable." };
 
-    const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
+    const group = await db.query.groups.findFirst({
+      where: and(eq(groups.instituteId, institute), eq(groups.id, groupId))});
     if (!group) return { success: false, error: "Groupe introuvable." };
 
     const memberIds = await getGroupMemberIds(groupId);
@@ -243,7 +261,7 @@ export async function attachSessionToGroup(
     }
 
     const alreadyIn = await db.query.sessionParticipants.findMany({
-      where: eq(sessionParticipants.sessionId, sessionId),
+      where: and(eq(sessionParticipants.instituteId, institute), eq(sessionParticipants.sessionId, sessionId)),
       columns: { studentProfileId: true },
     });
     const alreadyInIds = alreadyIn.map((p) => p.studentProfileId);
@@ -252,22 +270,23 @@ export async function attachSessionToGroup(
     await db
       .update(sessions)
       .set({ groupId, updatedAt: new Date() })
-      .where(eq(sessions.id, sessionId));
+      .where(and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)));
 
     if (toInsert.length > 0) {
       // Chaque membre est débitée sur SON forfait du même programme.
       const owner = await db.query.subscriptions.findFirst({
-        where: eq(subscriptions.id, session.subscriptionId),
+      where: and(eq(subscriptions.instituteId, institute), eq(subscriptions.id, session.subscriptionId)),
       });
 
       const rows = await Promise.all(
         toInsert.map(async (studentProfileId) => {
           const candidates = owner
             ? await db.query.subscriptions.findMany({
-                where: and(
-                  eq(subscriptions.studentProfileId, studentProfileId),
+      where: and(
+        eq(subscriptions.instituteId, institute),
+        eq(subscriptions.studentProfileId, studentProfileId),
                   eq(subscriptions.programId, owner.programId)
-                ),
+      ),
                 orderBy: (s, { desc }) => [desc(s.createdAt)],
               })
             : [];
@@ -285,7 +304,9 @@ export async function attachSessionToGroup(
         })
       );
 
-      await db.insert(sessionParticipants).values(rows);
+      await db
+        .insert(sessionParticipants)
+        .values(rows.map((row) => ({ ...row, instituteId: institute })));
     }
 
     revalidatePath(`/admin/sessions/${sessionId}`);

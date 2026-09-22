@@ -4,9 +4,13 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { and, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
-import { settings, SETTING_KEYS, prospects } from "@/db/schema";
+import { instituteSettings, SETTING_KEYS, prospects, CAPABILITIES } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-utils";
-import { getRegistrationToken } from "@/data/settings";
+import { assertCapability } from "@/lib/tenant";
+import {
+  getRegistrationToken,
+  findInstituteByRegistrationToken,
+} from "@/data/settings";
 import { readLevel } from "@/lib/student-import";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -33,10 +37,11 @@ export async function openRegistrationLink(): Promise<
 > {
   try {
     await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
     // 24 octets : impossible à deviner, et assez court pour tenir dans
     // un message sans être coupé.
     const token = randomBytes(24).toString("base64url");
-    await writeToken(token);
+    await writeToken(institute, token);
     revalidatePath("/admin/students");
     revalidatePath("/admin/settings");
     return { success: true, token };
@@ -48,7 +53,8 @@ export async function openRegistrationLink(): Promise<
 export async function closeRegistrationLink(): Promise<ActionResult> {
   try {
     await requireAdmin();
-    await writeToken("");
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
+    await writeToken(institute, "");
     revalidatePath("/admin/students");
     revalidatePath("/admin/settings");
     return { success: true };
@@ -57,31 +63,51 @@ export async function closeRegistrationLink(): Promise<ActionResult> {
   }
 }
 
-async function writeToken(value: string) {
+async function writeToken(instituteId: string, value: string) {
   await db
-    .insert(settings)
-    .values({ key: SETTING_KEYS.registrationToken, value })
+    .insert(instituteSettings)
+    .values({ instituteId, key: SETTING_KEYS.registrationToken, value })
     .onConflictDoUpdate({
-      target: settings.key,
+      target: [instituteSettings.instituteId, instituteSettings.key],
       set: { value, updatedAt: new Date() },
     });
 }
 
 /**
- * Le jeton donné vaut-il celui de l'institut ?
+ * À QUEL établissement ce jeton donne-t-il accès ? `null` sinon.
  *
- * La comparaison est à temps constant : comparer deux chaînes avec `===`
- * s'arrête au premier caractère différent, et le temps de réponse
- * laisserait deviner le jeton caractère par caractère.
+ * ── Pourquoi le jeton porte l'établissement ──
+ *
+ * La page publique n'a pas de session : rien d'autre que le jeton ne dit
+ * de quel institut il s'agit. C'est lui, et lui seul, qui décide où
+ * atterrit la demande — un jeton de l'institut A ne peut pas déposer un
+ * prospect chez B. Ce commentaire fait foi.
+ *
+ * La comparaison finale est à temps constant : comparer deux chaînes
+ * avec `===` s'arrête au premier caractère différent, et le temps de
+ * réponse laisserait deviner le jeton caractère par caractère.
  */
-export async function checkRegistrationToken(candidate: string): Promise<boolean> {
-  const token = await getRegistrationToken();
-  if (!token || !candidate) return false;
+export async function resolveRegistrationInstitute(
+  candidate: string
+): Promise<string | null> {
+  const clean = candidate?.trim();
+  if (!clean) return null;
+
+  const institute = await findInstituteByRegistrationToken(clean);
+  if (!institute) return null;
+
+  const token = await getRegistrationToken(institute);
+  if (!token) return null;
 
   const a = Buffer.from(token);
-  const b = Buffer.from(candidate);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  const b = Buffer.from(clean);
+  if (a.length !== b.length) return null;
+  return timingSafeEqual(a, b) ? institute : null;
+}
+
+/** Le jeton donné ouvre-t-il un lien d'inscription ? */
+export async function checkRegistrationToken(candidate: string): Promise<boolean> {
+  return (await resolveRegistrationInstitute(candidate)) !== null;
 }
 
 export type PublicRegistration = {
@@ -117,7 +143,8 @@ export async function submitPublicRegistration(
   data: PublicRegistration
 ): Promise<ActionResult> {
   try {
-    if (!(await checkRegistrationToken(token))) {
+    const institute = await resolveRegistrationInstitute(token);
+    if (!institute) {
       return { success: false, error: "Ce lien d'inscription n'est plus valable." };
     }
 
@@ -136,11 +163,16 @@ export async function submitPublicRegistration(
 
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const already = await db.query.prospects.findFirst({
-      where: and(eq(prospects.email, email), gte(prospects.createdAt, yesterday)),
+      where: and(
+        eq(prospects.email, email),
+        gte(prospects.createdAt, yesterday),
+        eq(prospects.instituteId, institute)
+      ),
     });
     if (already) return { success: true };
 
     await db.insert(prospects).values({
+      instituteId: institute,
       name,
       email,
       phone: data.phone.replace(/[^\d+]/g, "").slice(0, 30) || null,

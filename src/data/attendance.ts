@@ -1,5 +1,6 @@
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { requireInstitute } from "@/lib/tenant";
 import { monthKey } from "@/lib/datetime";
 import {
   sessions,
@@ -44,8 +45,12 @@ type Filters = {
  * séance à venir ne doit pas faire chuter le taux, et une séance
  * annulée n'est la faute de personne.
  */
-function attendanceConditions(filters: Filters = {}) {
+function attendanceConditions(institute: string, filters: Filters = {}) {
+  // L'établissement est un PARAMÈTRE exigé, pas une option : toutes les
+  // requêtes de ce fichier joignent `sessions` et passent par ici, donc
+  // toutes héritent du cloisonnement. Ce commentaire fait foi.
   const conditions = [
+    eq(sessions.instituteId, institute),
     lt(sessions.scheduledAt, new Date()),
     sql`${sessions.status} <> 'cancelled'`,
   ];
@@ -94,11 +99,12 @@ const countedColumns = {
 
 /** Assiduité globale, optionnellement filtrée par groupe et/ou par mois. */
 export async function getAttendanceStats(filters: Filters = {}): Promise<AttendanceStats> {
+  const institute = await requireInstitute();
   const [row] = await db
     .select(countedColumns)
     .from(sessionParticipants)
     .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
-    .where(attendanceConditions(filters));
+    .where(attendanceConditions(institute, filters));
 
   return buildStats(row ?? { attended: 0, missed: 0, excused: 0 });
 }
@@ -113,6 +119,7 @@ export async function getAttendanceStats(filters: Filters = {}): Promise<Attenda
 export async function getAttendanceByStudent(
   filters: Filters = {}
 ): Promise<StudentAttendance[]> {
+  const institute = await requireInstitute();
   const rows = await db
     .select({
       studentProfileId: studentProfiles.id,
@@ -126,7 +133,7 @@ export async function getAttendanceByStudent(
       eq(studentProfiles.id, sessionParticipants.studentProfileId)
     )
     .innerJoin(users, eq(users.id, studentProfiles.userId))
-    .where(attendanceConditions(filters))
+    .where(attendanceConditions(institute, filters))
     .groupBy(studentProfiles.id, users.name);
 
   return rows
@@ -144,13 +151,14 @@ export async function getAttendanceForStudent(
   studentProfileId: string,
   filters: Filters = {}
 ): Promise<AttendanceStats> {
+  const institute = await requireInstitute();
   const [row] = await db
     .select(countedColumns)
     .from(sessionParticipants)
     .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
     .where(
       and(
-        attendanceConditions(filters),
+        attendanceConditions(institute, filters),
         eq(sessionParticipants.studentProfileId, studentProfileId)
       )
     );
@@ -177,8 +185,10 @@ export async function getAttendanceForStudent(
  *      c'est le suivi pédagogique qui manque.
  */
 export async function getSessionsNeedingAttendance() {
+  const institute = await requireInstitute();
   const rows = await db.query.sessions.findMany({
     where: and(
+      eq(sessions.instituteId, institute),
       lt(sessions.scheduledAt, new Date()),
       sql`${sessions.status} <> 'cancelled'`
     ),
@@ -224,6 +234,7 @@ export async function getSessionsNeedingAttendance() {
  * Ce commentaire fait foi.
  */
 export async function getAttendanceByGroup(filters: Filters = {}) {
+  const institute = await requireInstitute();
   const rows = await db
     .select({
       groupId: groups.id,
@@ -233,7 +244,7 @@ export async function getAttendanceByGroup(filters: Filters = {}) {
     .from(sessionParticipants)
     .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
     .innerJoin(groups, eq(groups.id, sessions.groupId))
-    .where(attendanceConditions(filters))
+    .where(attendanceConditions(institute, filters))
     .groupBy(groups.id, groups.name);
 
   return rows
@@ -255,6 +266,7 @@ export async function getAttendanceByGroup(filters: Filters = {}) {
  * noter quelqu'un. Ce commentaire fait foi.
  */
 export async function getAttendanceByTeacher(filters: Filters = {}) {
+  const institute = await requireInstitute();
   const rows = await db
     .select({
       staffMemberId: staffMembers.id,
@@ -264,7 +276,7 @@ export async function getAttendanceByTeacher(filters: Filters = {}) {
     .from(sessionParticipants)
     .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
     .innerJoin(staffMembers, eq(staffMembers.id, sessions.staffMemberId))
-    .where(attendanceConditions(filters))
+    .where(attendanceConditions(institute, filters))
     .groupBy(staffMembers.id, staffMembers.name);
 
   return rows
@@ -294,6 +306,7 @@ export async function getAttendanceByMonth(
   timeZone: string,
   filters: Filters = {}
 ) {
+  const institute = await requireInstitute();
   const rows = await db
     .select({
       scheduledAt: sessions.scheduledAt,
@@ -301,7 +314,7 @@ export async function getAttendanceByMonth(
     })
     .from(sessionParticipants)
     .innerJoin(sessions, eq(sessions.id, sessionParticipants.sessionId))
-    .where(attendanceConditions(filters));
+    .where(attendanceConditions(institute, filters));
 
   const buckets = new Map<string, { attended: number; missed: number; excused: number }>();
 

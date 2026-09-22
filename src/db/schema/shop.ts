@@ -9,6 +9,7 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 import { studentProfiles } from "./student-profiles";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 export const shopItemStatusEnum = pgEnum("shop_item_status", [
   "available",
@@ -47,6 +48,11 @@ export type OrderLine = {
 
 export const shopItems = pgTable("shop_items", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   priceCents: integer("price_cents").notNull().default(0),
@@ -59,6 +65,11 @@ export const shopItems = pgTable("shop_items", {
 
 export const orders = pgTable("orders", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   studentProfileId: uuid("student_profile_id")
     .references(() => studentProfiles.id, { onDelete: "cascade" })
     .notNull(),

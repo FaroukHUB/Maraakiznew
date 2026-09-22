@@ -5,7 +5,8 @@ import { assertAdmin } from "@/lib/guards";
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { skills, skillProgress, programs } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { skills, skillProgress, programs, CAPABILITIES } from "@/db/schema";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -24,12 +25,13 @@ export async function createSkill(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     if (!data.label.trim()) {
       return { success: false, error: "L'intitulé de la compétence est obligatoire." };
     }
 
     const program = await db.query.programs.findFirst({
-      where: eq(programs.id, data.programId),
+      where: and(eq(programs.instituteId, institute), eq(programs.id, data.programId)),
     });
     if (!program) return { success: false, error: "Programme introuvable." };
 
@@ -37,9 +39,15 @@ export async function createSkill(data: {
     const [last] = await db
       .select({ max: sql<number>`coalesce(max(${skills.sortOrder}), -1)` })
       .from(skills)
-      .where(eq(skills.programId, data.programId));
+      .where(
+        and(
+          eq(skills.programId, data.programId),
+          eq(skills.instituteId, institute)
+        )
+      );
 
     await db.insert(skills).values({
+      instituteId: institute,
       programId: data.programId,
       label: data.label.trim(),
       unit: data.unit?.trim() || null,
@@ -67,7 +75,9 @@ export async function updateSkill(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const skill = await db.query.skills.findFirst({ where: eq(skills.id, skillId) });
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    const skill = await db.query.skills.findFirst({
+      where: and(eq(skills.instituteId, institute), eq(skills.id, skillId))});
     if (!skill) return { success: false, error: "Compétence introuvable." };
 
     if (data.label !== undefined && !data.label.trim()) {
@@ -84,7 +94,7 @@ export async function updateSkill(
         ...(data.active !== undefined && { active: data.active }),
         updatedAt: new Date(),
       })
-      .where(eq(skills.id, skillId));
+      .where(and(eq(skills.instituteId, institute), eq(skills.id, skillId)));
 
     revalidatePath("/admin/skills");
     return { success: true };
@@ -104,11 +114,13 @@ export async function moveSkill(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const skill = await db.query.skills.findFirst({ where: eq(skills.id, skillId) });
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    const skill = await db.query.skills.findFirst({
+      where: and(eq(skills.instituteId, institute), eq(skills.id, skillId))});
     if (!skill) return { success: false, error: "Compétence introuvable." };
 
     const siblings = await db.query.skills.findMany({
-      where: eq(skills.programId, skill.programId),
+      where: and(eq(skills.instituteId, institute), eq(skills.programId, skill.programId)),
       orderBy: (s, { asc }) => [asc(s.sortOrder), asc(s.createdAt)],
     });
 
@@ -121,11 +133,11 @@ export async function moveSkill(
     await db
       .update(skills)
       .set({ sortOrder: neighbour.sortOrder, updatedAt: new Date() })
-      .where(eq(skills.id, skill.id));
+      .where(and(eq(skills.instituteId, institute), eq(skills.id, skill.id)));
     await db
       .update(skills)
       .set({ sortOrder: skill.sortOrder, updatedAt: new Date() })
-      .where(eq(skills.id, neighbour.id));
+      .where(and(eq(skills.instituteId, institute), eq(skills.id, neighbour.id)));
 
     revalidatePath("/admin/skills");
     return { success: true };
@@ -144,10 +156,16 @@ export async function moveSkill(
 export async function deleteSkill(skillId: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     const [used] = await db
       .select({ count: sql<number>`count(*)` })
       .from(skillProgress)
-      .where(eq(skillProgress.skillId, skillId));
+      .where(
+        and(
+          eq(skillProgress.skillId, skillId),
+          eq(skillProgress.instituteId, institute)
+        )
+      );
 
     if (Number(used?.count ?? 0) > 0) {
       return {
@@ -156,7 +174,7 @@ export async function deleteSkill(skillId: string): Promise<ActionResult> {
       };
     }
 
-    await db.delete(skills).where(eq(skills.id, skillId));
+    await db.delete(skills).where(and(eq(skills.instituteId, institute), eq(skills.id, skillId)));
 
     revalidatePath("/admin/skills");
     return { success: true };
@@ -185,8 +203,10 @@ export async function setSkillStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     const existing = await db.query.skillProgress.findFirst({
       where: and(
+        eq(skillProgress.instituteId, institute),
         eq(skillProgress.studentProfileId, studentProfileId),
         eq(skillProgress.skillId, skillId)
       ),
@@ -194,7 +214,7 @@ export async function setSkillStatus(
 
     if (status === "not_started") {
       if (existing) {
-        await db.delete(skillProgress).where(eq(skillProgress.id, existing.id));
+        await db.delete(skillProgress).where(and(eq(skillProgress.instituteId, institute), eq(skillProgress.id, existing.id)));
       }
     } else if (existing) {
       const becomesAcquired = status === "acquired" && existing.status !== "acquired";
@@ -209,9 +229,10 @@ export async function setSkillStatus(
           ...(status === "in_progress" && { validatedAt: null }),
           updatedAt: new Date(),
         })
-        .where(eq(skillProgress.id, existing.id));
+        .where(and(eq(skillProgress.instituteId, institute), eq(skillProgress.id, existing.id)));
     } else {
       await db.insert(skillProgress).values({
+        instituteId: institute,
         studentProfileId,
         skillId,
         status,

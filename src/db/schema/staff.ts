@@ -10,6 +10,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -42,6 +43,11 @@ export const payrollStatusEnum = pgEnum("payroll_status", ["draft", "paid"]);
 
 export const staffMembers = pgTable("staff_members", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   // Un membre peut exister sans compte de connexion : l'institut suit des
   // personnes, pas seulement des utilisatrices de l'application.
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
@@ -63,6 +69,11 @@ export const payrollEntries = pgTable(
   "payroll_entries",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
     staffMemberId: uuid("staff_member_id")
       .references(() => staffMembers.id, { onDelete: "cascade" })
       .notNull(),

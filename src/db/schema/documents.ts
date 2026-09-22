@@ -8,6 +8,7 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { studentProfiles } from "./student-profiles";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 export const documentTypeEnum = pgEnum("document_type", [
   "contract",     // contrat d'inscription
@@ -32,6 +33,11 @@ export const documentTypeEnum = pgEnum("document_type", [
 
 export const documents = pgTable("documents", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   studentProfileId: uuid("student_profile_id").references(
     () => studentProfiles.id,
     { onDelete: "cascade" }

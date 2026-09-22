@@ -5,7 +5,8 @@ import { assertAdmin } from "@/lib/guards";
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { staffMembers, payrollEntries } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { staffMembers, payrollEntries, CAPABILITIES } from "@/db/schema";
 import { computePayroll } from "@/data/staff";
 
 type ActionResult =
@@ -26,6 +27,7 @@ export async function createStaffMember(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
     if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
     if (data.hourlyRate != null && data.monthlyRate != null) {
       return {
@@ -37,6 +39,7 @@ export async function createStaffMember(data: {
     const [created] = await db
       .insert(staffMembers)
       .values({
+        instituteId: institute,
         name: data.name.trim(),
         role: data.role,
         email: data.email?.trim() || null,
@@ -72,8 +75,9 @@ export async function updateStaffMember(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
     const member = await db.query.staffMembers.findFirst({
-      where: eq(staffMembers.id, id),
+      where: and(eq(staffMembers.instituteId, institute), eq(staffMembers.id, id)),
     });
     if (!member) return { success: false, error: "Membre introuvable." };
 
@@ -99,7 +103,9 @@ export async function updateStaffMember(
         ...(data.notes !== undefined && { notes: data.notes }),
         updatedAt: new Date(),
       })
-      .where(eq(staffMembers.id, id));
+      .where(
+        and(eq(staffMembers.instituteId, institute), eq(staffMembers.id, id))
+      );
 
     revalidatePath("/admin/staff");
     revalidatePath(`/admin/staff/${id}`);
@@ -120,11 +126,13 @@ export async function generatePayroll(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
     const computed = await computePayroll(staffMemberId, period);
     if (!computed) return { success: false, error: "Membre introuvable." };
 
     const existing = await db.query.payrollEntries.findFirst({
       where: and(
+        eq(payrollEntries.instituteId, institute),
         eq(payrollEntries.staffMemberId, staffMemberId),
         eq(payrollEntries.period, period)
       ),
@@ -141,9 +149,10 @@ export async function generatePayroll(
       await db
         .update(payrollEntries)
         .set({ ...computed, updatedAt: new Date() })
-        .where(eq(payrollEntries.id, existing.id));
+        .where(and(eq(payrollEntries.instituteId, institute), eq(payrollEntries.id, existing.id)));
     } else {
       await db.insert(payrollEntries).values({
+        instituteId: institute,
         staffMemberId,
         period,
         ...computed,
@@ -164,6 +173,7 @@ export async function setPayrollStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
     await db
       .update(payrollEntries)
       .set({
@@ -171,7 +181,7 @@ export async function setPayrollStatus(
         paidOn: status === "paid" ? new Date() : null,
         updatedAt: new Date(),
       })
-      .where(eq(payrollEntries.id, id));
+      .where(and(eq(payrollEntries.instituteId, institute), eq(payrollEntries.id, id)));
 
     revalidatePath("/admin/payroll");
     return { success: true };
@@ -187,11 +197,12 @@ export async function assignSessionStaff(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
     const { sessions } = await import("@/db/schema");
     await db
       .update(sessions)
       .set({ staffMemberId, updatedAt: new Date() })
-      .where(eq(sessions.id, sessionId));
+      .where(and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)));
 
     revalidatePath(`/admin/sessions/${sessionId}`);
     revalidatePath("/admin/supervision");

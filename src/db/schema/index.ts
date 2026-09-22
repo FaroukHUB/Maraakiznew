@@ -4,6 +4,20 @@ import { relations } from "drizzle-orm";
 
 export { users, userRoleEnum } from "./users";
 export {
+  institutes,
+  instituteMembers,
+  instituteSettings,
+  instituteImages,
+  instituteStatusEnum,
+  instituteRoleEnum,
+  CAPABILITIES,
+  ALL_CAPABILITIES,
+  ROLE_CAPABILITIES,
+  DEFAULT_INSTITUTE_ID,
+  capabilitiesOf,
+} from "./institutes";
+export type { Capability } from "./institutes";
+export {
   studentProfiles,
   arabicReadingLevelEnum,
   studentStatusEnum,
@@ -123,6 +137,7 @@ export {
 // ─── Imports for relations ───────────────────────────────
 
 import { users } from "./users";
+import { institutes, instituteMembers } from "./institutes";
 import { studentProfiles } from "./student-profiles";
 import { studentRewards, studentNotes } from "./student-followup";
 import { studentPhotos } from "./student-photos";
@@ -187,10 +202,26 @@ import { payments } from "./payments";
 //   posts (actualités, sans lien élève)
 //   prospects ──N appointments (acquisition, avant l'inscription)
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   studentProfile: one(studentProfiles, {
     fields: [users.id],
     references: [studentProfiles.userId],
+  }),
+  memberships: many(instituteMembers),
+}));
+
+export const institutesRelations = relations(institutes, ({ many }) => ({
+  members: many(instituteMembers),
+}));
+
+export const instituteMembersRelations = relations(instituteMembers, ({ one }) => ({
+  institute: one(institutes, {
+    fields: [instituteMembers.instituteId],
+    references: [institutes.id],
+  }),
+  user: one(users, {
+    fields: [instituteMembers.userId],
+    references: [users.id],
   }),
 }));
 

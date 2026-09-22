@@ -14,9 +14,14 @@ export async function requireAuth() {
   return user;
 }
 
+/**
+ * L'espace de travail est celui de l'ÉQUIPE : administration et
+ * personnel enseignant. Ce que chacune y fait dépend ensuite de son
+ * appartenance à l'établissement, pas de ce contrôle-ci.
+ */
 export async function requireAdmin() {
   const user = await requireAuth();
-  if (user.role !== "admin") {
+  if (user.role !== "admin" && user.role !== "staff") {
     redirect("/login");
   }
   return user;

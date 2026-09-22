@@ -8,6 +8,7 @@ import {
   groups,
   subscriptions,
 } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 
 export { STAFF_ROLE_LABELS, PAYROLL_STATUS_LABELS } from "@/lib/constants";
 
@@ -40,7 +41,9 @@ function periodRange(period: string): { from: Date; to: Date } | null {
  * Ce commentaire fait foi.
  */
 export async function getStaffForAdmin() {
+  const institute = await requireInstitute();
   const members = await db.query.staffMembers.findMany({
+    where: eq(staffMembers.instituteId, institute),
     orderBy: [asc(staffMembers.name)],
     with: { supervisor: true, user: true, groups: true },
   });
@@ -57,20 +60,34 @@ export async function getStaffForAdmin() {
  * Le rayonnement d'un membre : ses groupes, ses élèves, ses séances.
  */
 export async function getStaffReach(staffMemberId: string) {
+  const institute = await requireInstitute();
   const [ownGroups, individualRows, sessionRow] = await Promise.all([
     db.query.groups.findMany({
-      where: eq(groups.staffMemberId, staffMemberId),
+      where: and(
+        eq(groups.staffMemberId, staffMemberId),
+        eq(groups.instituteId, institute)
+      ),
       with: { members: true },
     }),
     db
       .selectDistinct({ studentProfileId: subscriptions.studentProfileId })
       .from(sessions)
       .innerJoin(subscriptions, eq(subscriptions.id, sessions.subscriptionId))
-      .where(eq(sessions.staffMemberId, staffMemberId)),
+      .where(
+        and(
+          eq(sessions.staffMemberId, staffMemberId),
+          eq(sessions.instituteId, institute)
+        )
+      ),
     db
       .select({ count: sql<number>`count(*)` })
       .from(sessions)
-      .where(eq(sessions.staffMemberId, staffMemberId))
+      .where(
+        and(
+          eq(sessions.staffMemberId, staffMemberId),
+          eq(sessions.instituteId, institute)
+        )
+      )
       .then((rows) => rows[0]),
   ]);
 
@@ -91,8 +108,12 @@ export async function getStaffReach(staffMemberId: string) {
 }
 
 export async function getStaffMemberById(id: string) {
+  const institute = await requireInstitute();
   return db.query.staffMembers.findFirst({
-    where: eq(staffMembers.id, id),
+    where: and(
+      eq(staffMembers.id, id),
+      eq(staffMembers.instituteId, institute)
+    ),
     with: {
       supervisor: true,
       supervised: true,
@@ -117,16 +138,19 @@ export async function getStaffNotebook(staffMemberId: string, limit = 50) {
   // table englobante — « sessions.session_id » — et cassait la page :
   // deux requêtes simples valent mieux qu'une astuce fausse.
   // Ce commentaire fait foi.
+  const institute = await requireInstitute();
   const noted = await db
     .selectDistinct({ sessionId: sessionNotes.sessionId })
-    .from(sessionNotes);
+    .from(sessionNotes)
+    .where(eq(sessionNotes.instituteId, institute));
   const ids = noted.map((row) => row.sessionId).filter(Boolean) as string[];
   if (ids.length === 0) return [];
 
   return db.query.sessions.findMany({
     where: and(
       eq(sessions.staffMemberId, staffMemberId),
-      inArray(sessions.id, ids)
+      inArray(sessions.id, ids),
+      eq(sessions.instituteId, institute)
     ),
     orderBy: [desc(sessions.scheduledAt)],
     limit,
@@ -148,15 +172,22 @@ export async function getStaffNotebook(staffMemberId: string, limit = 50) {
  * pour la même élève obligeraient à faire le tri à l'œil.
  */
 export async function getStaffStudents(staffMemberId: string) {
+  const institute = await requireInstitute();
   const [ownGroups, individual] = await Promise.all([
     db.query.groups.findMany({
-      where: eq(groups.staffMemberId, staffMemberId),
+      where: and(
+        eq(groups.staffMemberId, staffMemberId),
+        eq(groups.instituteId, institute)
+      ),
       with: {
         members: { with: { studentProfile: { with: { user: true } } } },
       },
     }),
     db.query.sessions.findMany({
-      where: eq(sessions.staffMemberId, staffMemberId),
+      where: and(
+        eq(sessions.staffMemberId, staffMemberId),
+        eq(sessions.instituteId, institute)
+      ),
       with: {
         subscription: {
           with: { studentProfile: { with: { user: true } }, program: true },
@@ -193,8 +224,12 @@ export async function getStaffStudents(staffMemberId: string) {
 }
 
 export async function getActiveStaffForSelect() {
+  const institute = await requireInstitute();
   return db.query.staffMembers.findMany({
-    where: eq(staffMembers.status, "active"),
+    where: and(
+      eq(staffMembers.status, "active"),
+      eq(staffMembers.instituteId, institute)
+    ),
     orderBy: [asc(staffMembers.name)],
     columns: { id: true, name: true, role: true },
   });
@@ -210,6 +245,7 @@ export async function getActiveStaffForSelect() {
 export async function getStaffActivity(staffMemberId: string, period: string) {
   const range = periodRange(period);
   if (!range) return { sessionsCount: 0, minutesWorked: 0 };
+  const institute = await requireInstitute();
 
   const [row] = await db
     .select({
@@ -222,7 +258,8 @@ export async function getStaffActivity(staffMemberId: string, period: string) {
         eq(sessions.staffMemberId, staffMemberId),
         gte(sessions.scheduledAt, range.from),
         lte(sessions.scheduledAt, range.to),
-        sql`${sessions.status} in ('completed','student_absent')`
+        sql`${sessions.status} in ('completed','student_absent')`,
+        eq(sessions.instituteId, institute)
       )
     );
 
@@ -240,8 +277,12 @@ export async function getStaffActivity(staffMemberId: string, period: string) {
  * l'application, ce n'est pas une donnée manquante.
  */
 export async function computePayroll(staffMemberId: string, period: string) {
+  const institute = await requireInstitute();
   const member = await db.query.staffMembers.findFirst({
-    where: eq(staffMembers.id, staffMemberId),
+    where: and(
+      eq(staffMembers.id, staffMemberId),
+      eq(staffMembers.instituteId, institute)
+    ),
   });
   if (!member) return null;
 
@@ -258,8 +299,12 @@ export async function computePayroll(staffMemberId: string, period: string) {
 }
 
 export async function getPayrollForPeriod(period: string) {
+  const institute = await requireInstitute();
   return db.query.payrollEntries.findMany({
-    where: eq(payrollEntries.period, period),
+    where: and(
+      eq(payrollEntries.period, period),
+      eq(payrollEntries.instituteId, institute)
+    ),
     orderBy: [asc(payrollEntries.createdAt)],
     with: { staffMember: true },
   });
@@ -267,8 +312,12 @@ export async function getPayrollForPeriod(period: string) {
 
 /** Vue de supervision : l'activité de chaque enseignante sur la période. */
 export async function getSupervisionOverview(period: string) {
+  const institute = await requireInstitute();
   const members = await db.query.staffMembers.findMany({
-    where: eq(staffMembers.status, "active"),
+    where: and(
+      eq(staffMembers.status, "active"),
+      eq(staffMembers.instituteId, institute)
+    ),
     orderBy: [asc(staffMembers.name)],
     with: { supervisor: true },
   });

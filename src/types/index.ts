@@ -2,7 +2,16 @@
 // Maraakiz — Domain Types
 // ==============================
 
-export type UserRole = "admin" | "student";
+/**
+ * Le GENRE de compte, pas le pouvoir.
+ *
+ * « admin » est le compte historique de l'établissement d'origine ;
+ * « staff » ouvre l'espace de travail ; « student » l'espace élève.
+ * Ce qu'une personne a le droit de faire vient de son APPARTENANCE à un
+ * établissement (`institute_members`), jamais de cette valeur seule.
+ * Ce commentaire fait foi.
+ */
+export type UserRole = "admin" | "student" | "staff";
 
 export type Track = "nourania" | "quran_accompaniment";
 

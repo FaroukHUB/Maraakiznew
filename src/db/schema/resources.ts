@@ -8,6 +8,7 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { programs } from "./programs";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -27,6 +28,11 @@ export const resourceTypeEnum = pgEnum("resource_type", [
 
 export const resources = pgTable("resources", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   type: resourceTypeEnum("type").notNull(),

@@ -5,6 +5,8 @@ import { DateClock } from "./date-clock";
 import { NotificationsBell } from "./notifications-bell";
 import { getNotifications } from "@/data/notifications";
 import { getViewerTimezone } from "@/data/timezones";
+import { getActiveInstitute, getMyInstitutes } from "@/lib/tenant";
+import { InstituteSwitcher } from "./institute-switcher";
 
 export async function Header({ variant }: { variant: "student" | "admin" }) {
   const session = await auth();
@@ -13,6 +15,10 @@ export async function Header({ variant }: { variant: "student" | "admin" }) {
   const notifications = variant === "admin" ? await getNotifications() : [];
   // Une élève voit ses heures, l'enseignante celles de l'institut.
   const timeZone = user?.id ? await getViewerTimezone(user.id) : "UTC";
+  // Le sélecteur n'existe que pour qui appartient à plusieurs
+  // établissements : voir `institute-switcher.tsx`.
+  const institutes = variant === "admin" ? await getMyInstitutes() : [];
+  const active = institutes.length > 1 ? await getActiveInstitute() : null;
   const initials = user?.name
     ? user.name
         .split(" ")
@@ -31,6 +37,9 @@ export async function Header({ variant }: { variant: "student" | "admin" }) {
       </div>
 
       <div className="flex items-center gap-3">
+        {institutes.length > 1 && active && (
+          <InstituteSwitcher institutes={institutes} currentId={active.id} />
+        )}
         <DateClock timeZone={timeZone} />
         {variant === "admin" && <NotificationsBell items={notifications} />}
         <span className="text-sm text-muted-foreground hidden sm:inline">

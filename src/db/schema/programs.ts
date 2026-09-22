@@ -7,6 +7,7 @@ import {
   boolean,
   integer,
 } from "drizzle-orm/pg-core";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Table ───────────────────────────────────────────────
 // Un programme = un parcours pédagogique (ex: "Nourania", "Accompagnement Coran").
@@ -15,6 +16,11 @@ import {
 
 export const programs = pgTable("programs", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   slug: varchar("slug", { length: 50 }).unique().notNull(), // "nourania", "quran_accompaniment"
   name: varchar("name", { length: 255 }).notNull(), // "Nourania", "Accompagnement Coran"
   description: text("description"),

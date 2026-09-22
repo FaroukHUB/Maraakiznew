@@ -355,6 +355,79 @@ photos/[photoId]` vérifie que la photo appartient bien à l'élève citée,
 et répond 404 — pas 403 — à toute autre personne connectée, pour ne rien
 apprendre à une adresse devinée.
 
+## Multi-établissements : le cloisonnement (lot 0)
+
+Une seule application, une seule base, et **un établissement propriétaire
+sur chaque ligne métier** (`institute_id`, 39 tables). Un `JOIN` s'oublie,
+un filtre à la racine ne s'oublie pas.
+
+**Le point d'entrée unique est `src/lib/tenant.ts`** :
+
+- `requireInstitute()` — l'établissement actif, ou un refus. Chaque
+  fonction de `src/data/` l'appelle et filtre dessus.
+- `assertCapability(capacité)` — le contrôle FIN : relit les
+  appartenances en base, sans attendre la reconnexion de la personne.
+- `getActiveInstitute()` — élève : celui de son profil ; membre : celui
+  du cookie `maraakiz-institut` **parmi ses appartenances déjà
+  vérifiées**. Aucune appartenance ⇒ refus, jamais un repli silencieux
+  sur l'établissement d'origine.
+
+**Deux filtres, et pas un seul.** `assertAdmin` écarte les élèves sans
+rien savoir des instituts ; `assertCapability` dit dans quel
+établissement on agit et si le rôle l'autorise. Le rôle `staff` désigne
+une enseignante : ce qu'elle peut faire vient de son appartenance.
+
+**La base garantit ce que le code ne peut pas.** Une requête qui oublie
+l'établissement se relit ; une INSERTION qui rattache une ligne au parent
+d'un autre institut ne se voit nulle part — elle est créée chez qui
+écrit, elle pointe ailleurs. C'était réel : l'essai a produit une note
+privée de B accrochée à une élève de A. D'où la migration `0011` et ses
+**52 clés étrangères composées** `(institute_id, colonne)` : le lien
+porte désormais l'établissement avec lui, et le cas devient impossible
+pour tout chemin d'écriture, y compris ceux qu'on n'a pas écrits.
+
+`npx tsx scripts/check-tenant-scope.ts` refuse tout fichier de `src/data/`
+qui interroge la base sans appeler `requireInstitute`. Trois exemptions
+nommées : `settings.ts`, `assets.ts` (lus par la disposition racine et la
+page publique, qui n'ont pas de session) et `preferences.ts` (propre à
+une personne).
+
+**Réglages et images par établissement.** Les tables historiques
+`settings` et `institute_assets` ont `key` pour clé primaire : deux
+instituts ne peuvent pas y coexister. Elles restent intactes — la
+production les lit encore — et servent de repli **pour le seul
+établissement d'origine**. Toute écriture va dans `institute_settings` /
+`institute_images`.
+
+**La page publique d'inscription n'a pas de session** : c'est le JETON
+qui désigne l'établissement (`resolveRegistrationInstitute`). Un jeton de
+A ne dépose pas un prospect chez B.
+
+### La preuve, et comment la refaire
+
+`scripts/fixture-institut-b.ts` crée un second établissement — il refuse
+toute base qui n'est pas locale (`scripts/local-only.ts`). Puis
+`node scripts/check-isolation.mjs`, serveur démarré : **70 vérifications**,
+dans les deux sens — 20 écrans, les fiches de A ouvertes par identifiant
+deviné, les routes de fichiers, les routes d'API, **7 actions serveur
+appelées à la main** avec l'en-tête `Next-Action` sur des données de
+l'autre institut, et enfin la base relue pour vérifier que rien n'a bougé
+chez A. Sans ce second établissement, une requête non cloisonnée passe
+tous les essais : c'est pourquoi la preuve exige deux instituts.
+
+### L'équipe
+
+`/admin/settings` → Équipe : qui travaille dans l'établissement, avec son
+rôle et les droits ajoutés au-delà du rôle. On rattache une personne qui a
+**déjà un compte** — créer un compte ici reviendrait à en distribuer les
+accès sans mot de passe choisi ni moyen de l'acheminer. Un compte élève
+n'administre pas. Un établissement garde toujours au moins un
+propriétaire. Retirer quelqu'un SUSPEND son appartenance : l'historique
+de son travail garde un sens, son accès cesse aussitôt.
+
+Le sélecteur d'établissement n'apparaît qu'à partir de deux
+appartenances.
+
 ## Décisions en attente de l'institut
 
 1. **Les absences excusées consomment-elles une séance du forfait ?**
@@ -407,10 +480,29 @@ les migrations sont additives.
 `npm run db:seed` **efface tout** avant de repeupler. Il ne doit jamais
 être lancé sur la base partagée sans décision explicite de l'institut.
 
+**Base de préversion distincte — ce qui manque.** La séparer demande deux
+choses que ce dépôt ne peut pas produire seul :
+
+1. **Une base PostgreSQL de préversion**, chez le fournisseur de votre
+   choix (Vercel Postgres / Neon, Supabase, ou tout hébergeur PostgreSQL 16).
+   Le choix vous revient : il engage un coût et un lieu d'hébergement des
+   données.
+2. **Sa chaîne de connexion posée dans Vercel**, sur le projet
+   `maraakiznew`, comme variable `DATABASE_URL` **restreinte à
+   l'environnement Preview**. La variable de production reste inchangée.
+
+Une fois ces deux points faits, un déploiement de préversion migrera sa
+propre base et non plus celle de production. Tant qu'ils ne le sont pas,
+la règle ci-dessus tient : **toute préversion migre la production**, et
+c'est ce qui rend les migrations additives obligatoires. Les valeurs de
+variables d'environnement ne sont jamais déchiffrées ni affichées ici.
+
 ## Vérification locale
 
 PostgreSQL est requis (`docker-compose.yml`). Avant de pousser :
-`npx tsc --noEmit`, `npm run lint`, `npx next build`.
+`npx tsc --noEmit`, `npm run lint`, `npx next build`,
+`npx tsx scripts/check-action-guards.ts`,
+`npx tsx scripts/check-tenant-scope.ts`.
 Une seule erreur de lint préexiste, dans `src/app/admin/subscriptions/new/form.tsx`.
 
 La recette au navigateur passe par les 47 pages d'administration et les 15

@@ -34,6 +34,12 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth;
   const role = req.auth?.user?.role;
+  // L'espace de travail est ouvert à l'équipe : l'administration, et le
+  // personnel qui appartient à au moins un établissement. Le middleware
+  // ne parle pas à la base : il lit ce que le jeton porte, et la
+  // vérification fine se refait au serveur. Ce commentaire fait foi.
+  const memberships = req.auth?.user?.memberships ?? [];
+  const isTeam = role === "admin" || (role === "staff" && memberships.length > 0);
 
   /*
     Le lien d'inscription est PUBLIC : c'est tout son intérêt. La page
@@ -48,8 +54,7 @@ export default auth((req) => {
   // Public routes
   if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
     if (isLoggedIn && pathname.startsWith("/login")) {
-      const redirectUrl =
-        role === "admin" ? "/admin/dashboard" : "/student/dashboard";
+      const redirectUrl = isTeam ? "/admin/dashboard" : "/student/dashboard";
       return redirectTo(req, redirectUrl);
     }
     return NextResponse.next();
@@ -60,8 +65,8 @@ export default auth((req) => {
     return redirectTo(req, "/login");
   }
 
-  // Admin routes — require admin role
-  if (pathname.startsWith("/admin") && role !== "admin") {
+  // Espace de travail — réservé à l'équipe
+  if (pathname.startsWith("/admin") && !isTeam) {
     return redirectTo(req, "/student/dashboard");
   }
 

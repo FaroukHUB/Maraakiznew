@@ -33,6 +33,8 @@ const PUBLIC: Record<string, string> = {
     "formulaire public : protégé par le jeton du lien, un champ piège et le garde-fou de doublon",
   "registration.checkRegistrationToken":
     "lecture seule : dit si un jeton est valable, n'écrit rien",
+  "registration.resolveRegistrationInstitute":
+    "lecture seule : dit à quel établissement mène un jeton, n'écrit rien ; c'est elle qui protège le formulaire public",
 };
 
 let failures = 0;

@@ -5,7 +5,8 @@ import { assertAdmin, assertOwnProfileOrAdmin } from "@/lib/guards";
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { courses, lessons, lessonProgress } from "@/db/schema";
+import { assertCapability, requireInstitute } from "@/lib/tenant";
+import { courses, lessons, lessonProgress, CAPABILITIES } from "@/db/schema";
 
 type ActionResult =
   | { success: true; id?: string }
@@ -18,15 +19,18 @@ export async function createCourse(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
 
     const [last] = await db
       .select({ max: sql<number>`coalesce(max(${courses.sortOrder}), 0)` })
-      .from(courses);
+      .from(courses)
+      .where(eq(courses.instituteId, institute));
 
     const [created] = await db
       .insert(courses)
       .values({
+        instituteId: institute,
         title: data.title.trim(),
         description: data.description?.trim() || null,
         programId: data.programId || null,
@@ -48,8 +52,9 @@ export async function setCourseStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     const course = await db.query.courses.findFirst({
-      where: eq(courses.id, id),
+      where: and(eq(courses.instituteId, institute), eq(courses.id, id)),
       with: { lessons: true },
     });
     if (!course) return { success: false, error: "Cours introuvable." };
@@ -60,7 +65,7 @@ export async function setCourseStatus(
     await db
       .update(courses)
       .set({ status, updatedAt: new Date() })
-      .where(eq(courses.id, id));
+      .where(and(eq(courses.instituteId, institute), eq(courses.id, id)));
 
     revalidatePath("/admin/courses");
     revalidatePath("/student/courses");
@@ -73,7 +78,9 @@ export async function setCourseStatus(
 export async function deleteCourse(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const course = await db.query.courses.findFirst({ where: eq(courses.id, id) });
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    const course = await db.query.courses.findFirst({
+      where: and(eq(courses.instituteId, institute), eq(courses.id, id))});
     if (!course) return { success: false, error: "Cours introuvable." };
     if (course.status === "published") {
       return {
@@ -82,7 +89,7 @@ export async function deleteCourse(id: string): Promise<ActionResult> {
       };
     }
 
-    await db.delete(courses).where(eq(courses.id, id));
+    await db.delete(courses).where(and(eq(courses.instituteId, institute), eq(courses.id, id)));
     revalidatePath("/admin/courses");
     return { success: true };
   } catch {
@@ -100,6 +107,7 @@ export async function addLesson(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
 
     if (data.contentUrl?.trim()) {
@@ -116,9 +124,15 @@ export async function addLesson(data: {
     const [last] = await db
       .select({ max: sql<number>`coalesce(max(${lessons.sortOrder}), -1)` })
       .from(lessons)
-      .where(eq(lessons.courseId, data.courseId));
+      .where(
+        and(
+          eq(lessons.courseId, data.courseId),
+          eq(lessons.instituteId, institute)
+        )
+      );
 
     await db.insert(lessons).values({
+      instituteId: institute,
       courseId: data.courseId,
       title: data.title.trim(),
       type: data.type,
@@ -142,7 +156,8 @@ export async function deleteLesson(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    await db.delete(lessons).where(eq(lessons.id, id));
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    await db.delete(lessons).where(and(eq(lessons.instituteId, institute), eq(lessons.id, id)));
     revalidatePath(`/admin/courses/${courseId}`);
     revalidatePath("/student/courses");
     return { success: true };
@@ -161,18 +176,20 @@ export async function setLessonCompleted(
     // Une élève coche SES leçons : l'identifiant de profil vient du
     // navigateur, il ne prouve rien par lui-même.
     await assertOwnProfileOrAdmin(studentProfileId);
+    const institute = await requireInstitute();
 
     const existing = await db.query.lessonProgress.findFirst({
       where: and(
+        eq(lessonProgress.instituteId, institute),
         eq(lessonProgress.lessonId, lessonId),
         eq(lessonProgress.studentProfileId, studentProfileId)
       ),
     });
 
     if (completed && !existing) {
-      await db.insert(lessonProgress).values({ lessonId, studentProfileId });
+      await db.insert(lessonProgress).values({ instituteId: institute, lessonId, studentProfileId });
     } else if (!completed && existing) {
-      await db.delete(lessonProgress).where(eq(lessonProgress.id, existing.id));
+      await db.delete(lessonProgress).where(and(eq(lessonProgress.instituteId, institute), eq(lessonProgress.id, existing.id)));
     }
 
     revalidatePath("/student/courses");

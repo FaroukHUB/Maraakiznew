@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { users, studentProfiles } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { users, studentProfiles, CAPABILITIES } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-utils";
 import { parseSpreadsheet, MAX_SPREADSHEET_ROWS } from "@/lib/spreadsheet";
 import {
@@ -168,6 +169,7 @@ export async function runStudentImport(
 ): Promise<ImportOutcome> {
   try {
     await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
 
     if (rows.length === 0) return { success: false, error: "Rien à importer." };
     if (rows.length > MAX_SPREADSHEET_ROWS) {
@@ -253,6 +255,7 @@ export async function runStudentImport(
           .returning();
 
         await tx.insert(studentProfiles).values({
+          instituteId: institute,
           userId: user.id,
           whatsappPhone: readPhone(row.values.whatsappPhone) || null,
           localPhone: readPhone(row.values.localPhone) || null,

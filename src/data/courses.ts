@@ -1,19 +1,23 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { courses, lessons, lessonProgress } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 
 export { LESSON_TYPE_LABELS } from "@/lib/constants";
 
 export async function getCoursesForAdmin() {
+  const institute = await requireInstitute();
   return db.query.courses.findMany({
+    where: eq(courses.instituteId, institute),
     orderBy: [asc(courses.sortOrder), asc(courses.title)],
     with: { program: true, lessons: { orderBy: [asc(lessons.sortOrder)] } },
   });
 }
 
 export async function getCourseById(id: string) {
+  const institute = await requireInstitute();
   return db.query.courses.findFirst({
-    where: eq(courses.id, id),
+    where: and(eq(courses.id, id), eq(courses.instituteId, institute)),
     with: { program: true, lessons: { orderBy: [asc(lessons.sortOrder)] } },
   });
 }
@@ -25,8 +29,12 @@ export async function getCourseById(id: string) {
  * pas dire l'avoir suivie.
  */
 export async function getCoursesForStudent(studentProfileId: string) {
+  const institute = await requireInstitute();
   const published = await db.query.courses.findMany({
-    where: eq(courses.status, "published"),
+    where: and(
+      eq(courses.status, "published"),
+      eq(courses.instituteId, institute)
+    ),
     orderBy: [asc(courses.sortOrder), asc(courses.title)],
     with: { program: true, lessons: { orderBy: [asc(lessons.sortOrder)] } },
   });
@@ -35,7 +43,10 @@ export async function getCoursesForStudent(studentProfileId: string) {
   const done =
     lessonIds.length > 0
       ? await db.query.lessonProgress.findMany({
-          where: inArray(lessonProgress.lessonId, lessonIds),
+          where: and(
+            inArray(lessonProgress.lessonId, lessonIds),
+            eq(lessonProgress.instituteId, institute)
+          ),
         })
       : [];
 

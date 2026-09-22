@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { studentProfiles, arabicReadingLevelEnum } from "./student-profiles";
 import { programs } from "./programs";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -41,6 +42,11 @@ export const appointmentStatusEnum = pgEnum("appointment_status", [
 
 export const prospects = pgTable("prospects", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }),
   phone: varchar("phone", { length: 50 }),
@@ -70,6 +76,11 @@ export const prospects = pgTable("prospects", {
 
 export const appointments = pgTable("appointments", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   prospectId: uuid("prospect_id").references(() => prospects.id, {
     onDelete: "cascade",
   }),

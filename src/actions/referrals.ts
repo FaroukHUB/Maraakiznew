@@ -3,14 +3,16 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { assertCapability } from "@/lib/tenant";
 import {
   referralCodes,
   referrals,
   studentProfiles,
   prospects,
   generateReferralCode,
+  CAPABILITIES,
 } from "@/db/schema";
 
 type ActionResult =
@@ -28,13 +30,14 @@ export async function ensureReferralCode(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const existing = await db.query.referralCodes.findFirst({
-      where: eq(referralCodes.studentProfileId, studentProfileId),
+      where: and(eq(referralCodes.instituteId, institute), eq(referralCodes.studentProfileId, studentProfileId)),
     });
     if (existing) return { success: true, code: existing.code };
 
     const student = await db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, studentProfileId),
+      where: and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, studentProfileId)),
     });
     if (!student) return { success: false, error: "Élève introuvable." };
 
@@ -42,13 +45,13 @@ export async function ensureReferralCode(
     let code = generateReferralCode(studentProfileId);
     for (let attempt = 0; attempt < 5; attempt++) {
       const clash = await db.query.referralCodes.findFirst({
-        where: eq(referralCodes.code, code),
+      where: and(eq(referralCodes.instituteId, institute), eq(referralCodes.code, code)),
       });
       if (!clash) break;
       code = generateReferralCode(code + attempt);
     }
 
-    await db.insert(referralCodes).values({ studentProfileId, code });
+    await db.insert(referralCodes).values({ instituteId: institute, studentProfileId, code });
 
     revalidatePath("/admin/referrals");
     return { success: true, code };
@@ -65,22 +68,24 @@ export async function attachReferral(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const entry = await db.query.referralCodes.findFirst({
-      where: eq(referralCodes.code, code.trim().toUpperCase()),
+      where: and(eq(referralCodes.instituteId, institute), eq(referralCodes.code, code.trim().toUpperCase())),
     });
     if (!entry) return { success: false, error: "Code de parrainage inconnu." };
 
     const prospect = await db.query.prospects.findFirst({
-      where: eq(prospects.id, prospectId),
+      where: and(eq(prospects.instituteId, institute), eq(prospects.id, prospectId)),
     });
     if (!prospect) return { success: false, error: "Prospect introuvable." };
 
     const already = await db.query.referrals.findFirst({
-      where: eq(referrals.prospectId, prospectId),
+      where: and(eq(referrals.instituteId, institute), eq(referrals.prospectId, prospectId)),
     });
     if (already) return { success: false, error: "Ce prospect est déjà parrainé." };
 
     await db.insert(referrals).values({
+      instituteId: institute,
       referrerProfileId: entry.studentProfileId,
       prospectId,
       rewardCents,
@@ -107,6 +112,7 @@ export async function markReferralEarned(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     await db
       .update(referrals)
       .set({
@@ -115,7 +121,7 @@ export async function markReferralEarned(
         earnedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(referrals.prospectId, prospectId));
+      .where(and(eq(referrals.instituteId, institute), eq(referrals.prospectId, prospectId)));
 
     revalidatePath("/admin/referrals");
     return { success: true };
@@ -130,8 +136,9 @@ export async function setReferralStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const referral = await db.query.referrals.findFirst({
-      where: eq(referrals.id, id),
+      where: and(eq(referrals.instituteId, institute), eq(referrals.id, id)),
     });
     if (!referral) return { success: false, error: "Parrainage introuvable." };
     if (status === "rewarded" && referral.status !== "earned") {
@@ -148,7 +155,7 @@ export async function setReferralStatus(
         rewardedAt: status === "rewarded" ? new Date() : null,
         updatedAt: new Date(),
       })
-      .where(eq(referrals.id, id));
+      .where(and(eq(referrals.instituteId, institute), eq(referrals.id, id)));
 
     revalidatePath("/admin/referrals");
     return { success: true };
@@ -163,11 +170,12 @@ export async function setReferralReward(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     if (reward < 0) return { success: false, error: "La récompense ne peut pas être négative." };
     await db
       .update(referrals)
       .set({ rewardCents: Math.round(reward * 100), updatedAt: new Date() })
-      .where(eq(referrals.id, id));
+      .where(and(eq(referrals.instituteId, institute), eq(referrals.id, id)));
 
     revalidatePath("/admin/referrals");
     return { success: true };

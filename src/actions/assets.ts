@@ -1,16 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  instituteImages,
   instituteAssets,
+  DEFAULT_INSTITUTE_ID,
+  CAPABILITIES,
   ASSET_KEYS,
   ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
   type AssetKey,
 } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-utils";
+import { assertCapability } from "@/lib/tenant";
 import { decodeImageDataUrl, sniffImageType } from "@/lib/image-bytes";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -34,6 +38,7 @@ export async function saveInstituteImage(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
 
     if (!Object.values(ASSET_KEYS).includes(key)) {
       return { success: false, error: "Image inconnue." };
@@ -74,10 +79,16 @@ export async function saveInstituteImage(
     }
 
     await db
-      .insert(instituteAssets)
-      .values({ key, mimeType: real, byteSize: bytes.byteLength, data: bytes })
+      .insert(instituteImages)
+      .values({
+        instituteId: institute,
+        key,
+        mimeType: real,
+        byteSize: bytes.byteLength,
+        data: bytes,
+      })
       .onConflictDoUpdate({
-        target: instituteAssets.key,
+        target: [instituteImages.instituteId, instituteImages.key],
         set: {
           mimeType: real,
           byteSize: bytes.byteLength,
@@ -96,7 +107,21 @@ export async function saveInstituteImage(
 export async function deleteInstituteImage(key: AssetKey): Promise<ActionResult> {
   try {
     await requireAdmin();
-    await db.delete(instituteAssets).where(eq(instituteAssets.key, key));
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
+    await db
+      .delete(instituteImages)
+      .where(
+        and(
+          eq(instituteImages.instituteId, institute),
+          eq(instituteImages.key, key)
+        )
+      );
+    // L'établissement d'origine peut avoir son bandeau dans la table
+    // historique : sans cette ligne, l'image supprimée réapparaîtrait au
+    // rendu suivant, par le repli de lecture. Ce commentaire fait foi.
+    if (institute === DEFAULT_INSTITUTE_ID) {
+      await db.delete(instituteAssets).where(eq(instituteAssets.key, key));
+    }
     revalidatePath("/admin", "layout");
     return { success: true };
   } catch {

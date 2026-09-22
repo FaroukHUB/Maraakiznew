@@ -1,6 +1,7 @@
 import { and, asc, eq, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { memorizationItems, studentProfiles, users } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -25,10 +26,12 @@ function daysBetween(from: Date, to: Date): number {
 
 /** Portions mémorisées par une élève, la plus urgente d'abord. */
 export async function getMemorizationForStudent(studentProfileId: string) {
+  const institute = await requireInstitute();
   const items = await db.query.memorizationItems.findMany({
     where: and(
       eq(memorizationItems.studentProfileId, studentProfileId),
-      eq(memorizationItems.active, true)
+      eq(memorizationItems.active, true),
+      eq(memorizationItems.instituteId, institute)
     ),
     orderBy: [asc(memorizationItems.nextReviewAt)],
     with: {
@@ -54,6 +57,7 @@ export async function getMemorizationForStudent(studentProfileId: string) {
  * est simplement à faire.
  */
 export async function getDueReviews(limit?: number): Promise<DueItem[]> {
+  const institute = await requireInstitute();
   const now = new Date();
 
   const rows = await db
@@ -77,7 +81,8 @@ export async function getDueReviews(limit?: number): Promise<DueItem[]> {
     .where(
       and(
         eq(memorizationItems.active, true),
-        lte(memorizationItems.nextReviewAt, now)
+        lte(memorizationItems.nextReviewAt, now),
+        eq(memorizationItems.instituteId, institute)
       )
     )
     .orderBy(asc(memorizationItems.nextReviewAt))
@@ -91,13 +96,15 @@ export async function getDueReviews(limit?: number): Promise<DueItem[]> {
 
 /** Nombre de révisions dues — pour l'indicateur du tableau de bord. */
 export async function getDueReviewCount(): Promise<number> {
+  const institute = await requireInstitute();
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(memorizationItems)
     .where(
       and(
         eq(memorizationItems.active, true),
-        lte(memorizationItems.nextReviewAt, new Date())
+        lte(memorizationItems.nextReviewAt, new Date()),
+        eq(memorizationItems.instituteId, institute)
       )
     );
   return Number(row?.count ?? 0);
@@ -112,6 +119,7 @@ export async function getDueReviewCount(): Promise<number> {
 export async function getMemorizedAyahCount(
   studentProfileId: string
 ): Promise<number> {
+  const institute = await requireInstitute();
   const [row] = await db
     .select({
       total: sql<number>`coalesce(sum(${memorizationItems.ayahEnd} - ${memorizationItems.ayahStart} + 1), 0)`,
@@ -120,7 +128,8 @@ export async function getMemorizedAyahCount(
     .where(
       and(
         eq(memorizationItems.studentProfileId, studentProfileId),
-        eq(memorizationItems.active, true)
+        eq(memorizationItems.active, true),
+        eq(memorizationItems.instituteId, institute)
       )
     );
   return Number(row?.total ?? 0);

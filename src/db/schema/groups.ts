@@ -11,6 +11,7 @@ import {
 import { studentProfiles, arabicReadingLevelEnum } from "./student-profiles";
 import { programs } from "./programs";
 import { staffMembers } from "./staff";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -37,6 +38,11 @@ export const groupStatusEnum = pgEnum("group_status", [
 
 export const groups = pgTable("groups", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   programId: uuid("program_id").references(() => programs.id, {
     onDelete: "set null",
   }),
@@ -70,6 +76,11 @@ export const groupMembers = pgTable(
   "group_members",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
     groupId: uuid("group_id")
       .references(() => groups.id, { onDelete: "cascade" })
       .notNull(),

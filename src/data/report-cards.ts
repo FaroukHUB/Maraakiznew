@@ -11,6 +11,7 @@ import {
   subscriptions,
   type ProgramProgressSnapshot,
 } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 import { getStudentProgress } from "@/data/skills";
 import { getMemorizedAyahCount } from "@/data/memorization";
 
@@ -50,6 +51,7 @@ export async function computeSnapshot(
   periodStart: Date,
   periodEnd: Date
 ): Promise<ReportCardSnapshot> {
+  const institute = await requireInstitute();
   // La borne de fin est inclusive : on prend la journée entière.
   const end = new Date(periodEnd);
   end.setHours(23, 59, 59, 999);
@@ -70,7 +72,8 @@ export async function computeSnapshot(
         eq(sessionParticipants.studentProfileId, studentProfileId),
         gte(sessions.scheduledAt, periodStart),
         lte(sessions.scheduledAt, end),
-        sql`${sessions.status} <> 'cancelled'`
+        sql`${sessions.status} <> 'cancelled'`,
+        eq(sessions.instituteId, institute)
       )
     );
 
@@ -90,7 +93,8 @@ export async function computeSnapshot(
         gte(sessions.scheduledAt, periodStart),
         lte(sessions.scheduledAt, end),
         sql`${sessions.status} <> 'cancelled'`,
-        sql`(${subscriptions.studentProfileId} = ${studentProfileId} or ${sessionParticipants.studentProfileId} = ${studentProfileId})`
+        sql`(${subscriptions.studentProfileId} = ${studentProfileId} or ${sessionParticipants.studentProfileId} = ${studentProfileId})`,
+        eq(sessions.instituteId, institute)
       )
     );
 
@@ -115,7 +119,8 @@ export async function computeSnapshot(
         eq(skillProgress.status, "acquired"),
         sql`${skillProgress.validatedAt} is not null`,
         gte(skillProgress.validatedAt, periodStart),
-        lte(skillProgress.validatedAt, end)
+        lte(skillProgress.validatedAt, end),
+        eq(skillProgress.instituteId, institute)
       )
     );
 
@@ -129,7 +134,8 @@ export async function computeSnapshot(
       and(
         eq(memorizationItems.studentProfileId, studentProfileId),
         gte(memorizationItems.memorizedAt, periodStart),
-        lte(memorizationItems.memorizedAt, end)
+        lte(memorizationItems.memorizedAt, end),
+        eq(memorizationItems.instituteId, institute)
       )
     );
 
@@ -144,7 +150,8 @@ export async function computeSnapshot(
       and(
         eq(memorizationItems.studentProfileId, studentProfileId),
         gte(memorizationReviews.reviewedAt, periodStart),
-        lte(memorizationReviews.reviewedAt, end)
+        lte(memorizationReviews.reviewedAt, end),
+        eq(memorizationReviews.instituteId, institute)
       )
     );
 
@@ -167,25 +174,33 @@ export async function computeSnapshot(
 // ─── Queries ─────────────────────────────────────────────
 
 export async function getReportCardsForAdmin() {
+  const institute = await requireInstitute();
   return db.query.reportCards.findMany({
+    where: eq(reportCards.instituteId, institute),
     orderBy: [desc(reportCards.periodEnd), desc(reportCards.createdAt)],
     with: { studentProfile: { with: { user: true } } },
   });
 }
 
 export async function getReportCardById(id: string) {
+  const institute = await requireInstitute();
   return db.query.reportCards.findFirst({
-    where: eq(reportCards.id, id),
+    where: and(
+      eq(reportCards.id, id),
+      eq(reportCards.instituteId, institute)
+    ),
     with: { studentProfile: { with: { user: true } } },
   });
 }
 
 /** Bulletins publiés d'une élève — c'est tout ce qu'elle doit voir. */
 export async function getPublishedReportCards(studentProfileId: string) {
+  const institute = await requireInstitute();
   return db.query.reportCards.findMany({
     where: and(
       eq(reportCards.studentProfileId, studentProfileId),
-      eq(reportCards.status, "published")
+      eq(reportCards.status, "published"),
+      eq(reportCards.instituteId, institute)
     ),
     orderBy: [desc(reportCards.periodEnd)],
   });

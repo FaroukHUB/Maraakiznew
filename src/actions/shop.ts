@@ -3,9 +3,10 @@
 import { assertAdmin, assertOwnProfileOrAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { shopItems, orders, studentProfiles, type OrderLine } from "@/db/schema";
+import { assertCapability, requireInstitute } from "@/lib/tenant";
+import { shopItems, orders, studentProfiles, type OrderLine, CAPABILITIES } from "@/db/schema";
 
 type ActionResult =
   | { success: true; id?: string }
@@ -21,6 +22,7 @@ export async function createShopItem(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     if (!data.name.trim()) return { success: false, error: "Le nom est obligatoire." };
     if (data.price < 0) return { success: false, error: "Le prix ne peut pas être négatif." };
     if (data.stock != null && data.stock < 0) {
@@ -28,6 +30,7 @@ export async function createShopItem(data: {
     }
 
     await db.insert(shopItems).values({
+      instituteId: institute,
       name: data.name.trim(),
       priceCents: Math.round(data.price * 100),
       stock: data.stock ?? null,
@@ -49,6 +52,7 @@ export async function updateShopItem(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     await db
       .update(shopItems)
       .set({
@@ -57,7 +61,7 @@ export async function updateShopItem(
         ...(data.status !== undefined && { status: data.status }),
         updatedAt: new Date(),
       })
-      .where(eq(shopItems.id, id));
+      .where(and(eq(shopItems.instituteId, institute), eq(shopItems.id, id)));
 
     revalidatePath("/admin/shop");
     revalidatePath("/student/shop");
@@ -70,7 +74,8 @@ export async function updateShopItem(
 export async function deleteShopItem(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
-    await db.delete(shopItems).where(eq(shopItems.id, id));
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    await db.delete(shopItems).where(and(eq(shopItems.instituteId, institute), eq(shopItems.id, id)));
     revalidatePath("/admin/shop");
     return { success: true };
   } catch {
@@ -92,9 +97,10 @@ export async function createOrder(data: {
     // Une élève commande pour ELLE. Sans cette vérification, il suffisait
     // de changer un identifiant pour commander au nom d'une autre.
     await assertOwnProfileOrAdmin(data.studentProfileId);
+    const institute = await requireInstitute();
 
     const student = await db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, data.studentProfileId),
+      where: and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, data.studentProfileId)),
     });
     if (!student) return { success: false, error: "Élève introuvable." };
 
@@ -106,7 +112,7 @@ export async function createOrder(data: {
     const lines: OrderLine[] = [];
     for (const wish of wanted) {
       const item = await db.query.shopItems.findFirst({
-        where: eq(shopItems.id, wish.itemId),
+      where: and(eq(shopItems.instituteId, institute), eq(shopItems.id, wish.itemId)),
       });
       if (!item) return { success: false, error: "Article introuvable." };
       if (item.status !== "available") {
@@ -131,6 +137,7 @@ export async function createOrder(data: {
     const [created] = await db
       .insert(orders)
       .values({
+        instituteId: institute,
         studentProfileId: data.studentProfileId,
         lines,
         totalCents,
@@ -143,7 +150,7 @@ export async function createOrder(data: {
       await db
         .update(shopItems)
         .set({ stock: sql`${shopItems.stock} - ${line.quantity}` })
-        .where(sql`${shopItems.id} = ${line.itemId} and ${shopItems.stock} is not null`);
+        .where(and(eq(shopItems.instituteId, institute), sql`${shopItems.id} = ${line.itemId} and ${shopItems.stock} is not null`));
     }
 
     revalidatePath("/admin/shop");
@@ -160,7 +167,9 @@ export async function setOrderStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const order = await db.query.orders.findFirst({ where: eq(orders.id, id) });
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    const order = await db.query.orders.findFirst({
+      where: and(eq(orders.instituteId, institute), eq(orders.id, id))});
     if (!order) return { success: false, error: "Commande introuvable." };
 
     // Annuler rend les exemplaires réservés.
@@ -169,7 +178,7 @@ export async function setOrderStatus(
         await db
           .update(shopItems)
           .set({ stock: sql`${shopItems.stock} + ${line.quantity}` })
-          .where(sql`${shopItems.id} = ${line.itemId} and ${shopItems.stock} is not null`);
+          .where(and(eq(shopItems.instituteId, institute), sql`${shopItems.id} = ${line.itemId} and ${shopItems.stock} is not null`));
       }
     }
 
@@ -181,7 +190,7 @@ export async function setOrderStatus(
         deliveredAt: status === "delivered" ? new Date() : null,
         updatedAt: new Date(),
       })
-      .where(eq(orders.id, id));
+      .where(and(eq(orders.instituteId, institute), eq(orders.id, id)));
 
     revalidatePath("/admin/shop");
     revalidatePath("/student/shop");

@@ -5,7 +5,9 @@ import {
   skillProgress,
   subscriptions,
   ACQUIRED_STATUS,
+  programs,
 } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -52,8 +54,13 @@ function buildProgress(
 
 /** Compétences actives d'un programme, dans l'ordre pédagogique. */
 export async function getSkillsByProgram(programId: string) {
+  const institute = await requireInstitute();
   return db.query.skills.findMany({
-    where: and(eq(skills.programId, programId), eq(skills.active, true)),
+    where: and(
+      eq(skills.programId, programId),
+      eq(skills.active, true),
+      eq(skills.instituteId, institute)
+    ),
     orderBy: [asc(skills.sortOrder), asc(skills.createdAt)],
   });
 }
@@ -65,7 +72,9 @@ export async function getSkillsByProgram(programId: string) {
  * référentiel, pas celle d'une élève.
  */
 export async function getProgramsWithSkills() {
+  const institute = await requireInstitute();
   const allPrograms = await db.query.programs.findMany({
+    where: eq(programs.instituteId, institute),
     orderBy: (p, { asc }) => [asc(p.sortOrder)],
     with: {
       skills: {
@@ -89,8 +98,12 @@ export async function getProgramsWithSkills() {
 export async function getStudentProgress(
   studentProfileId: string
 ): Promise<ProgramProgress[]> {
+  const institute = await requireInstitute();
   const subs = await db.query.subscriptions.findMany({
-    where: eq(subscriptions.studentProfileId, studentProfileId),
+    where: and(
+      eq(subscriptions.studentProfileId, studentProfileId),
+      eq(subscriptions.instituteId, institute)
+    ),
     with: { program: true },
   });
 
@@ -111,10 +124,17 @@ export async function getStudentProgress(
       skillProgress,
       and(
         eq(skillProgress.skillId, skills.id),
-        eq(skillProgress.studentProfileId, studentProfileId)
+        eq(skillProgress.studentProfileId, studentProfileId),
+        eq(skillProgress.instituteId, institute)
       )
     )
-    .where(and(inArray(skills.programId, programIds), eq(skills.active, true)))
+    .where(
+      and(
+        inArray(skills.programId, programIds),
+        eq(skills.active, true),
+        eq(skills.instituteId, institute)
+      )
+    )
     .groupBy(skills.programId);
 
   const byProgram = new Map(rows.map((r) => [r.programId, r]));
@@ -136,6 +156,7 @@ export async function getStudentSkillsForProgram(
   studentProfileId: string,
   programId: string
 ): Promise<SkillWithStatus[]> {
+  const institute = await requireInstitute();
   const programSkills = await getSkillsByProgram(programId);
   if (programSkills.length === 0) return [];
 
@@ -145,7 +166,8 @@ export async function getStudentSkillsForProgram(
       inArray(
         skillProgress.skillId,
         programSkills.map((s) => s.id)
-      )
+      ),
+      eq(skillProgress.instituteId, institute)
     ),
   });
   const bySkill = new Map(progress.map((p) => [p.skillId, p]));
@@ -177,8 +199,12 @@ export async function getStudentSkillsForProgram(
 export async function getAverageProgressByProgram(): Promise<
   (ProgramProgress & { studentCount: number })[]
 > {
+  const institute = await requireInstitute();
   const activeSubs = await db.query.subscriptions.findMany({
-    where: eq(subscriptions.status, "active"),
+    where: and(
+      eq(subscriptions.status, "active"),
+      eq(subscriptions.instituteId, institute)
+    ),
     with: { program: true },
   });
 
@@ -217,7 +243,8 @@ export async function getAverageProgressByProgram(): Promise<
           inArray(
             skillProgress.skillId,
             programSkills.map((s) => s.id)
-          )
+          ),
+          eq(skillProgress.instituteId, institute)
         )
       )
       .groupBy(skillProgress.studentProfileId);
@@ -258,10 +285,12 @@ export async function getAverageProgressByProgram(): Promise<
  * Sert à afficher, sur la fiche d'une séance, ce qui y a été acquis.
  */
 export async function getSkillsValidatedInSession(sessionId: string) {
+  const institute = await requireInstitute();
   return db.query.skillProgress.findMany({
     where: and(
       eq(skillProgress.sessionId, sessionId),
-      eq(skillProgress.status, ACQUIRED_STATUS)
+      eq(skillProgress.status, ACQUIRED_STATUS),
+      eq(skillProgress.instituteId, institute)
     ),
     with: {
       skill: true,

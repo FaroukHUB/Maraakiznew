@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { subscriptions, sessions } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 
 export async function GET() {
   const session = await auth();
@@ -10,8 +11,12 @@ export async function GET() {
     return NextResponse.json([], { status: 401 });
   }
 
+  const institute = await requireInstitute();
   const activeSubs = await db.query.subscriptions.findMany({
-    where: eq(subscriptions.status, "active"),
+    where: and(
+      eq(subscriptions.status, "active"),
+      eq(subscriptions.instituteId, institute)
+    ),
     with: {
       studentProfile: { with: { user: true } },
       program: true,

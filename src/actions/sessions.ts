@@ -3,8 +3,9 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq, and, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
+import { assertCapability, requireInstitute } from "@/lib/tenant";
 import {
   sessions,
   sessionNotes,
@@ -12,6 +13,7 @@ import {
   sessionParticipants,
   subscriptions,
   CONSUMING_STATUSES,
+  CAPABILITIES,
 } from "@/db/schema";
 import {
   getConsumedSessionCount,
@@ -35,8 +37,10 @@ async function resolveParticipantSubscription(
   studentProfileId: string,
   programId: string
 ): Promise<string | null> {
+  const institute = await requireInstitute();
   const candidates = await db.query.subscriptions.findMany({
     where: and(
+      eq(subscriptions.instituteId, institute),
       eq(subscriptions.studentProfileId, studentProfileId),
       eq(subscriptions.programId, programId)
     ),
@@ -53,11 +57,15 @@ async function resolveParticipantSubscription(
  * statut de séance — celui du porteur comme ceux des participantes.
  */
 async function closeCompletedSubscriptions(sessionId: string) {
+  const institute = await requireInstitute();
   const affected = await getSubscriptionIdsAffectedBySession(sessionId);
 
   for (const subscriptionId of affected) {
     const sub = await db.query.subscriptions.findFirst({
-      where: eq(subscriptions.id, subscriptionId),
+      where: and(
+        eq(subscriptions.instituteId, institute),
+        eq(subscriptions.id, subscriptionId)
+      ),
     });
     if (!sub || sub.status !== "active") continue;
 
@@ -70,7 +78,12 @@ async function closeCompletedSubscriptions(sessionId: string) {
           closedAt: new Date(),
           closureReason: "all_sessions_consumed",
         })
-        .where(eq(subscriptions.id, sub.id));
+        .where(
+          and(
+            eq(subscriptions.instituteId, institute),
+            eq(subscriptions.id, sub.id)
+          )
+        );
     }
   }
 }
@@ -86,9 +99,10 @@ export async function createSession(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.sessionsManage);
     // Verify subscription exists and is active
     const sub = await db.query.subscriptions.findFirst({
-      where: eq(subscriptions.id, data.subscriptionId),
+      where: and(eq(subscriptions.instituteId, institute), eq(subscriptions.id, data.subscriptionId)),
     });
     if (!sub) return { success: false, error: "Forfait introuvable." };
     if (sub.status !== "active")
@@ -110,6 +124,7 @@ export async function createSession(data: {
     }
 
     await db.insert(sessions).values({
+      instituteId: institute,
       subscriptionId: data.subscriptionId,
       sessionNumber: data.sessionNumber,
       scheduledAt: data.scheduledAt,
@@ -138,8 +153,9 @@ export async function updateSession(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.sessionsManage);
     const session = await db.query.sessions.findFirst({
-      where: eq(sessions.id, sessionId),
+      where: and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)),
     });
     if (!session) return { success: false, error: "Séance introuvable." };
 
@@ -151,7 +167,7 @@ export async function updateSession(
         ...(data.zoomLink !== undefined && { zoomLink: data.zoomLink || null }),
         updatedAt: new Date(),
       })
-      .where(eq(sessions.id, sessionId));
+      .where(and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)));
 
     revalidatePath("/admin/sessions");
     revalidatePath(`/admin/sessions/${sessionId}`);
@@ -176,8 +192,9 @@ export async function updateSessionStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.sessionsManage);
     const session = await db.query.sessions.findFirst({
-      where: eq(sessions.id, sessionId),
+      where: and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)),
       with: { subscription: true },
     });
     if (!session) return { success: false, error: "Séance introuvable." };
@@ -186,7 +203,7 @@ export async function updateSessionStatus(
     await db
       .update(sessions)
       .set({ status: newStatus, updatedAt: new Date() })
-      .where(eq(sessions.id, sessionId));
+      .where(and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)));
 
     // Referme les forfaits arrivés à leur terme : le porteur ET les
     // participantes, qu'une séance de groupe débite aussi.
@@ -216,8 +233,9 @@ export async function saveSessionNotes(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.sessionsManage);
     const existing = await db.query.sessionNotes.findFirst({
-      where: eq(sessionNotes.sessionId, sessionId),
+      where: and(eq(sessionNotes.instituteId, institute), eq(sessionNotes.sessionId, sessionId)),
     });
 
     if (existing) {
@@ -229,9 +247,10 @@ export async function saveSessionNotes(
           homework: data.homework ?? existing.homework,
           updatedAt: new Date(),
         })
-        .where(eq(sessionNotes.id, existing.id));
+        .where(and(eq(sessionNotes.instituteId, institute), eq(sessionNotes.id, existing.id)));
     } else {
       await db.insert(sessionNotes).values({
+        instituteId: institute,
         sessionId,
         content: data.content || null,
         stopReference: data.stopReference || null,
@@ -260,15 +279,16 @@ export async function setSessionParticipants(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.sessionsManage);
     // Remove existing participants for this session
     await db
       .delete(sessionParticipants)
-      .where(eq(sessionParticipants.sessionId, sessionId));
+      .where(and(eq(sessionParticipants.instituteId, institute), eq(sessionParticipants.sessionId, sessionId)));
 
     // Insert new participants, chacune rattachée à son propre forfait
     if (participants.length > 0) {
       const session = await db.query.sessions.findFirst({
-        where: eq(sessions.id, sessionId),
+      where: and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)),
         with: { subscription: true },
       });
       if (!session) return { success: false, error: "Séance introuvable." };
@@ -286,7 +306,9 @@ export async function setSessionParticipants(
         }))
       );
 
-      await db.insert(sessionParticipants).values(rows);
+      await db
+        .insert(sessionParticipants)
+        .values(rows.map((row) => ({ ...row, instituteId: institute })));
     }
 
     await closeCompletedSubscriptions(sessionId);
@@ -312,7 +334,9 @@ export async function addSessionResource(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.sessionsManage);
     await db.insert(sessionResources).values({
+      instituteId: institute,
       sessionId,
       title: data.title,
       type: data.type,
@@ -335,9 +359,10 @@ export async function deleteSessionResource(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.sessionsManage);
     await db
       .delete(sessionResources)
-      .where(eq(sessionResources.id, resourceId));
+      .where(and(eq(sessionResources.instituteId, institute), eq(sessionResources.id, resourceId)));
 
     revalidatePath(`/admin/sessions/${sessionId}`);
     return { success: true };
@@ -352,8 +377,9 @@ export async function deleteSessionResource(
 export async function deleteSession(sessionId: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.sessionsManage);
     const session = await db.query.sessions.findFirst({
-      where: eq(sessions.id, sessionId),
+      where: and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)),
     });
     if (!session) return { success: false, error: "Séance introuvable." };
     if (session.status !== "planned")
@@ -362,7 +388,7 @@ export async function deleteSession(sessionId: string): Promise<ActionResult> {
         error: "Seules les séances planifiées peuvent être supprimées.",
       };
 
-    await db.delete(sessions).where(eq(sessions.id, sessionId));
+    await db.delete(sessions).where(and(eq(sessions.instituteId, institute), eq(sessions.id, sessionId)));
 
     revalidatePath("/admin/sessions");
     revalidatePath("/admin/dashboard");

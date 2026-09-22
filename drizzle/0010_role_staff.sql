@@ -1,0 +1,22 @@
+-- 0010 — le rôle « staff ».
+--
+-- Une enseignante salariée n'est ni administratrice globale ni élève :
+-- son pouvoir vient de son APPARTENANCE à un établissement
+-- (`institute_members`), pas de son rôle global. Ce rôle sert seulement
+-- à dire de quel genre de compte il s'agit, et à ouvrir l'espace de
+-- travail plutôt que l'espace élève.
+--
+-- L'authentification n'est pas touchée : même fournisseur, même flux,
+-- même jeton. Seule une valeur s'ajoute à un type énuméré.
+--
+-- L'ancienne production ne connaît pas cette valeur : elle traitera un
+-- compte « staff » comme un compte non administrateur et le renverra
+-- vers l'espace élève. Elle ne plante pas, elle ne lui ouvre rien.
+--
+-- Note PostgreSQL : une valeur ajoutée à un type énuméré ne peut pas
+-- être UTILISÉE dans la transaction qui l'ajoute. Ce fichier ne fait
+-- donc que l'ajouter ; l'application s'en sert ensuite.
+--
+-- Strictement additif.
+
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'staff';

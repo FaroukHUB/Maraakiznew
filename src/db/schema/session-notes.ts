@@ -7,6 +7,7 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { sessions } from "./sessions";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -34,6 +35,11 @@ export const resourceVisibilityEnum = pgEnum("resource_visibility", [
 
 export const sessionNotes = pgTable("session_notes", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   sessionId: uuid("session_id")
     .references(() => sessions.id, { onDelete: "cascade" })
     .unique()
@@ -51,6 +57,11 @@ export const sessionNotes = pgTable("session_notes", {
 
 export const sessionResources = pgTable("session_resources", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   sessionId: uuid("session_id")
     .references(() => sessions.id, { onDelete: "cascade" })
     .notNull(),

@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { studentProfiles } from "./student-profiles";
 import { sessions } from "./sessions";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -67,6 +68,11 @@ export function computeNextReview(from: Date, intervalIndex: number): Date {
 
 export const memorizationItems = pgTable("memorization_items", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   studentProfileId: uuid("student_profile_id")
     .references(() => studentProfiles.id, { onDelete: "cascade" })
     .notNull(),
@@ -91,6 +97,11 @@ export const memorizationItems = pgTable("memorization_items", {
 
 export const memorizationReviews = pgTable("memorization_reviews", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   itemId: uuid("item_id")
     .references(() => memorizationItems.id, { onDelete: "cascade" })
     .notNull(),

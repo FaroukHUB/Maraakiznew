@@ -1,5 +1,6 @@
 import { eq, sql, and, asc, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
+import { requireInstitute } from "@/lib/tenant";
 import { getConsumedSessionCounts } from "@/data/sessions";
 import {
   users,
@@ -35,19 +36,30 @@ export type StudentWithDetails = StudentWithProfile & {
 export async function getStudentByUserId(
   userId: string
 ): Promise<StudentWithProfile | null> {
-  const result = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    with: { studentProfile: true },
+  const institute = await requireInstitute();
+  // On part du PROFIL et non de l'utilisateur : le compte est commun à
+  // toute l'application, l'inscription appartient à un établissement.
+  // Filtrer à la racine plutôt que vérifier après coup.
+  const profile = await db.query.studentProfiles.findFirst({
+    where: and(
+      eq(studentProfiles.userId, userId),
+      eq(studentProfiles.instituteId, institute)
+    ),
+    with: { user: true },
   });
-  if (!result || !result.studentProfile) return null;
-  return { ...result, profile: result.studentProfile };
+  if (!profile) return null;
+  return { ...profile.user, profile };
 }
 
 export async function getStudentByProfileId(
   profileId: string
 ): Promise<StudentWithProfile | null> {
+  const institute = await requireInstitute();
   const profile = await db.query.studentProfiles.findFirst({
-    where: eq(studentProfiles.id, profileId),
+    where: and(
+      eq(studentProfiles.id, profileId),
+      eq(studentProfiles.instituteId, institute)
+    ),
     with: { user: true },
   });
   if (!profile) return null;
@@ -55,7 +67,9 @@ export async function getStudentByProfileId(
 }
 
 export async function getAllStudentsWithDetails(): Promise<StudentWithDetails[]> {
+  const institute = await requireInstitute();
   const allProfiles = await db.query.studentProfiles.findMany({
+    where: eq(studentProfiles.instituteId, institute),
     with: {
       user: true,
       subscriptions: {
@@ -105,9 +119,13 @@ export async function getAllStudentsWithDetails(): Promise<StudentWithDetails[]>
 // ─── Admin: full student profile ─────────────────────────
 
 export async function getStudentFullProfile(profileId: string) {
+  const institute = await requireInstitute();
   // Main profile with subscriptions, sessions, payments (4 levels max)
   const profile = await db.query.studentProfiles.findFirst({
-    where: eq(studentProfiles.id, profileId),
+    where: and(
+      eq(studentProfiles.id, profileId),
+      eq(studentProfiles.instituteId, institute)
+    ),
     with: {
       user: true,
       subscriptions: {
@@ -133,7 +151,10 @@ export async function getStudentFullProfile(profileId: string) {
   // Group participations loaded separately to avoid 6-level nesting
   // (PostgreSQL truncates aliases beyond 63 chars)
   const participations = await db.query.sessionParticipants.findMany({
-    where: eq(sessionParticipants.studentProfileId, profileId),
+    where: and(
+      eq(sessionParticipants.studentProfileId, profileId),
+      eq(sessionParticipants.instituteId, institute)
+    ),
     with: {
       session: {
         with: {
@@ -149,9 +170,11 @@ export async function getStudentFullProfile(profileId: string) {
 }
 
 export async function getStudentCount(): Promise<number> {
+  const institute = await requireInstitute();
   const result = await db
     .select({ count: sql<number>`count(*)` })
-    .from(studentProfiles);
+    .from(studentProfiles)
+    .where(eq(studentProfiles.instituteId, institute));
   return Number(result[0].count);
 }
 
@@ -207,8 +230,10 @@ export type StudentRow = {
  * avec l'institut. Ce commentaire fait foi.
  */
 export async function getStudentsForAdmin(): Promise<StudentRow[]> {
+  const institute = await requireInstitute();
   const [profiles, memberships, teachingSessions, rewards] = await Promise.all([
     db.query.studentProfiles.findMany({
+      where: eq(studentProfiles.instituteId, institute),
       with: {
         user: true,
         subscriptions: { with: { program: true } },
@@ -216,10 +241,14 @@ export async function getStudentsForAdmin(): Promise<StudentRow[]> {
       },
     }),
     db.query.groupMembers.findMany({
+      where: eq(groupMembers.instituteId, institute),
       with: { group: { with: { staffMember: true } } },
     }),
     db.query.sessions.findMany({
-      where: isNotNull(sessions.staffMemberId),
+      where: and(
+        isNotNull(sessions.staffMemberId),
+        eq(sessions.instituteId, institute)
+      ),
       columns: { subscriptionId: true },
       with: {
         staffMember: { columns: { id: true, name: true } },
@@ -229,7 +258,9 @@ export async function getStudentsForAdmin(): Promise<StudentRow[]> {
     db.select({
       studentProfileId: studentRewards.studentProfileId,
       kind: studentRewards.kind,
-    }).from(studentRewards),
+    })
+      .from(studentRewards)
+      .where(eq(studentRewards.instituteId, institute)),
   ]);
 
   const activeSubIds = profiles
@@ -314,8 +345,12 @@ export async function getStudentsForAdmin(): Promise<StudentRow[]> {
 
 /** Les groupes d'une élève, avec l'enseignante qui les tient. */
 export async function getStudentGroups(profileId: string) {
+  const institute = await requireInstitute();
   const rows = await db.query.groupMembers.findMany({
-    where: eq(groupMembers.studentProfileId, profileId),
+    where: and(
+      eq(groupMembers.studentProfileId, profileId),
+      eq(groupMembers.instituteId, institute)
+    ),
     with: { group: { with: { staffMember: true, program: true } } },
   });
   return rows
@@ -334,8 +369,12 @@ export async function getStudentGroups(profileId: string) {
 
 /** Les étoiles d'une élève, la plus récente d'abord. */
 export async function getStudentRewards(profileId: string) {
+  const institute = await requireInstitute();
   return db.query.studentRewards.findMany({
-    where: eq(studentRewards.studentProfileId, profileId),
+    where: and(
+      eq(studentRewards.studentProfileId, profileId),
+      eq(studentRewards.instituteId, institute)
+    ),
     orderBy: (r, { desc }) => [desc(r.createdAt)],
     with: { grantedByUser: { columns: { name: true } } },
   });
@@ -343,8 +382,12 @@ export async function getStudentRewards(profileId: string) {
 
 /** Les notes privées portées sur une élève, la plus récente d'abord. */
 export async function getStudentNotes(profileId: string) {
+  const institute = await requireInstitute();
   return db.query.studentNotes.findMany({
-    where: eq(studentNotes.studentProfileId, profileId),
+    where: and(
+      eq(studentNotes.studentProfileId, profileId),
+      eq(studentNotes.instituteId, institute)
+    ),
     orderBy: (n, { desc }) => [desc(n.createdAt)],
     with: { author: { columns: { name: true } } },
   });
@@ -359,10 +402,12 @@ export async function getStudentNotes(profileId: string) {
  * Ce commentaire fait foi.
  */
 export async function getRevisionReminders(profileId: string, limit = 5) {
+  const institute = await requireInstitute();
   const items = await db.query.memorizationItems.findMany({
     where: and(
       eq(memorizationItems.studentProfileId, profileId),
-      eq(memorizationItems.active, true)
+      eq(memorizationItems.active, true),
+      eq(memorizationItems.instituteId, institute)
     ),
     orderBy: [asc(memorizationItems.nextReviewAt)],
     limit,
@@ -397,36 +442,57 @@ export async function getStudentActivity(
   profileId: string,
   limit = 12
 ): Promise<ActivityEntry[]> {
+  const institute = await requireInstitute();
   const [profileSessions, rewards, notes, memorized, paid] = await Promise.all([
     db.query.sessions.findMany({
-      where: inArray(
-        sessions.subscriptionId,
-        db
-          .select({ id: subscriptions.id })
-          .from(subscriptions)
-          .where(eq(subscriptions.studentProfileId, profileId))
+      where: and(
+        inArray(
+          sessions.subscriptionId,
+          db
+            .select({ id: subscriptions.id })
+            .from(subscriptions)
+            .where(
+              and(
+                eq(subscriptions.studentProfileId, profileId),
+                eq(subscriptions.instituteId, institute)
+              )
+            )
+        ),
+        eq(sessions.instituteId, institute)
       ),
       orderBy: (s, { desc }) => [desc(s.scheduledAt)],
       limit,
       with: { notes: true },
     }),
     db.query.studentRewards.findMany({
-      where: eq(studentRewards.studentProfileId, profileId),
+      where: and(
+        eq(studentRewards.studentProfileId, profileId),
+        eq(studentRewards.instituteId, institute)
+      ),
       orderBy: (r, { desc }) => [desc(r.createdAt)],
       limit,
     }),
     db.query.studentNotes.findMany({
-      where: eq(studentNotes.studentProfileId, profileId),
+      where: and(
+        eq(studentNotes.studentProfileId, profileId),
+        eq(studentNotes.instituteId, institute)
+      ),
       orderBy: (n, { desc }) => [desc(n.createdAt)],
       limit,
     }),
     db.query.memorizationItems.findMany({
-      where: eq(memorizationItems.studentProfileId, profileId),
+      where: and(
+        eq(memorizationItems.studentProfileId, profileId),
+        eq(memorizationItems.instituteId, institute)
+      ),
       orderBy: (m, { desc }) => [desc(m.memorizedAt)],
       limit,
     }),
     db.query.payments.findMany({
-      where: eq(payments.studentProfileId, profileId),
+      where: and(
+        eq(payments.studentProfileId, profileId),
+        eq(payments.instituteId, institute)
+      ),
       orderBy: (p, { desc }) => [desc(p.createdAt)],
       limit,
     }),
@@ -484,8 +550,12 @@ export async function getStudentActivity(
  * `/api/students/[id]/photos/[photoId]`. Ce commentaire fait foi.
  */
 export async function getStudentPhotos(profileId: string) {
+  const institute = await requireInstitute();
   return db.query.studentPhotos.findMany({
-    where: eq(studentPhotos.studentProfileId, profileId),
+    where: and(
+      eq(studentPhotos.studentProfileId, profileId),
+      eq(studentPhotos.instituteId, institute)
+    ),
     orderBy: (p, { desc }) => [desc(p.createdAt)],
     columns: {
       id: true,

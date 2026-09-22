@@ -3,12 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { assertCapability, assertStudentInInstitute } from "@/lib/tenant";
 import {
   studentRewards,
   studentNotes,
   type RewardKind,
+  CAPABILITIES,
 } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth-utils";
+import { NotAllowed } from "@/lib/guards";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -33,7 +36,10 @@ export async function grantReward(
 ): Promise<ActionResult> {
   try {
     const admin = await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
+    await assertStudentInInstitute(profileId);
     await db.insert(studentRewards).values({
+      instituteId: institute,
       studentProfileId: profileId,
       kind,
       reason: reason?.trim() || null,
@@ -41,7 +47,10 @@ export async function grantReward(
     });
     refresh(profileId);
     return { success: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof NotAllowed) {
+      return { success: false, error: error.message };
+    }
     return { success: false, error: "Impossible d'enregistrer l'étoile." };
   }
 }
@@ -59,11 +68,13 @@ export async function revokeLastReward(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const [last] = await db
       .select({ id: studentRewards.id })
       .from(studentRewards)
       .where(
         and(
+          eq(studentRewards.instituteId, institute),
           eq(studentRewards.studentProfileId, profileId),
           eq(studentRewards.kind, kind)
         )
@@ -73,7 +84,7 @@ export async function revokeLastReward(
 
     if (!last) return { success: false, error: "Rien à retirer." };
 
-    await db.delete(studentRewards).where(eq(studentRewards.id, last.id));
+    await db.delete(studentRewards).where(and(eq(studentRewards.instituteId, institute), eq(studentRewards.id, last.id)));
     refresh(profileId);
     return { success: true };
   } catch {
@@ -89,17 +100,23 @@ export async function addStudentNote(
 ): Promise<ActionResult> {
   try {
     const admin = await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
+    await assertStudentInInstitute(profileId);
     const text = content.trim();
     if (!text) return { success: false, error: "La note est vide." };
 
     await db.insert(studentNotes).values({
+      instituteId: institute,
       studentProfileId: profileId,
       content: text,
       authorId: admin.id ?? null,
     });
     refresh(profileId);
     return { success: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof NotAllowed) {
+      return { success: false, error: error.message };
+    }
     return { success: false, error: "Impossible d'enregistrer la note." };
   }
 }
@@ -110,13 +127,14 @@ export async function updateStudentNote(
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const text = content.trim();
     if (!text) return { success: false, error: "La note est vide." };
 
     const [updated] = await db
       .update(studentNotes)
       .set({ content: text, updatedAt: new Date() })
-      .where(eq(studentNotes.id, noteId))
+      .where(and(eq(studentNotes.instituteId, institute), eq(studentNotes.id, noteId)))
       .returning({ profileId: studentNotes.studentProfileId });
 
     if (!updated) return { success: false, error: "Note introuvable." };
@@ -130,9 +148,10 @@ export async function updateStudentNote(
 export async function deleteStudentNote(noteId: string): Promise<ActionResult> {
   try {
     await requireAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const [removed] = await db
       .delete(studentNotes)
-      .where(eq(studentNotes.id, noteId))
+      .where(and(eq(studentNotes.instituteId, institute), eq(studentNotes.id, noteId)))
       .returning({ profileId: studentNotes.studentProfileId });
 
     if (!removed) return { success: false, error: "Note introuvable." };

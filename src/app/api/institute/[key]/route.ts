@@ -1,6 +1,14 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { instituteAssets, ASSET_KEYS } from "@/db/schema";
+import {
+  instituteAssets,
+  instituteImages,
+  DEFAULT_INSTITUTE_ID,
+  ASSET_KEYS,
+} from "@/db/schema";
+
+/** Un identifiant d'établissement, et rien d'autre. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Sert une image de l'institut.
@@ -14,10 +22,12 @@ import { instituteAssets, ASSET_KEYS } from "@/db/schema";
  *
  * L'image de l'institut n'est pas un secret : la route est publique,
  * comme un logo sur un site. Seule l'ÉCRITURE est réservée à
- * l'administration.
+ * l'administration. L'établissement est lu dans l'adresse (`e=`) parce
+ * qu'une route publique n'a pas de session ; à défaut, c'est celui
+ * d'origine, comme avant le multi-établissement.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ key: string }> }
 ) {
   const { key } = await params;
@@ -27,9 +37,24 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const asset = await db.query.instituteAssets.findFirst({
-    where: eq(instituteAssets.key, key),
+  const asked = new URL(request.url).searchParams.get("e");
+  const institute = asked && UUID.test(asked) ? asked : DEFAULT_INSTITUTE_ID;
+
+  const own = await db.query.instituteImages.findFirst({
+    where: and(
+      eq(instituteImages.instituteId, institute),
+      eq(instituteImages.key, key)
+    ),
   });
+
+  // Repli sur la table historique pour le seul établissement d'origine.
+  const asset =
+    own ??
+    (institute === DEFAULT_INSTITUTE_ID
+      ? await db.query.instituteAssets.findFirst({
+          where: eq(instituteAssets.key, key),
+        })
+      : undefined);
 
   if (!asset) return new Response("Not found", { status: 404 });
 

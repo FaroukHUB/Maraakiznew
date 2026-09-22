@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { subscriptions } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 
 export async function GET(
   _request: Request,
@@ -14,8 +15,12 @@ export async function GET(
   }
 
   const { id } = await params;
+  const institute = await requireInstitute();
   const sub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, id),
+    where: and(
+      eq(subscriptions.id, id),
+      eq(subscriptions.instituteId, institute)
+    ),
   });
 
   if (!sub) return NextResponse.json({}, { status: 404 });

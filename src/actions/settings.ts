@@ -4,7 +4,8 @@ import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { settings, SETTING_KEYS } from "@/db/schema";
+import { instituteSettings, CAPABILITIES, SETTING_KEYS } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
 import { isValidTimezone } from "@/lib/timezones";
 import { parseHex } from "@/lib/color";
 
@@ -24,6 +25,10 @@ export async function updateSettings(values: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    // Les réglages s'écrivent TOUJOURS dans la table par établissement,
+    // jamais dans la table historique : celle-ci n'a qu'une ligne par
+    // clé et serait partagée par tous les instituts.
+    const institute = await assertCapability(CAPABILITIES.instituteManage);
     if (values.instituteName !== undefined && !values.instituteName.trim()) {
       return { success: false, error: "Le nom de l'institut est obligatoire." };
     }
@@ -77,10 +82,10 @@ export async function updateSettings(values: {
 
     for (const [key, value] of entries) {
       await db
-        .insert(settings)
-        .values({ key, value })
+        .insert(instituteSettings)
+        .values({ instituteId: institute, key, value })
         .onConflictDoUpdate({
-          target: settings.key,
+          target: [instituteSettings.instituteId, instituteSettings.key],
           set: { value, updatedAt: new Date() },
         });
     }

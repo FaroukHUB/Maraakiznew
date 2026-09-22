@@ -11,6 +11,7 @@ import {
 import { studentProfiles, arabicReadingLevelEnum } from "./student-profiles";
 import { programs } from "./programs";
 import { groups } from "./groups";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 //
@@ -54,6 +55,11 @@ export function scorePercentage(score: number, maxScore: number): number {
 
 export const assessments = pgTable("assessments", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   title: varchar("title", { length: 255 }).notNull(),
   type: assessmentTypeEnum("type").notNull().default("quiz"),
   status: assessmentStatusEnum("status").notNull().default("draft"),
@@ -79,6 +85,11 @@ export const assessmentResults = pgTable(
   "assessment_results",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
     assessmentId: uuid("assessment_id")
       .references(() => assessments.id, { onDelete: "cascade" })
       .notNull(),

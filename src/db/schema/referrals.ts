@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { studentProfiles } from "./student-profiles";
 import { prospects } from "./prospects";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 export const referralStatusEnum = pgEnum("referral_status", [
   "pending",  // la filleule est prospect
@@ -30,6 +31,11 @@ export const referralStatusEnum = pgEnum("referral_status", [
 
 export const referralCodes = pgTable("referral_codes", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   studentProfileId: uuid("student_profile_id")
     .references(() => studentProfiles.id, { onDelete: "cascade" })
     .notNull()
@@ -40,6 +46,11 @@ export const referralCodes = pgTable("referral_codes", {
 
 export const referrals = pgTable("referrals", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   referrerProfileId: uuid("referrer_profile_id")
     .references(() => studentProfiles.id, { onDelete: "cascade" })
     .notNull(),

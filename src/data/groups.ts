@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { groups, groupMembers, sessions } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 import { getAttendanceStats } from "@/data/attendance";
 
 // ─── Admin queries ───────────────────────────────────────
@@ -17,7 +18,9 @@ import { getAttendanceStats } from "@/data/attendance";
  * des milliers. Ce commentaire fait foi.
  */
 export async function getAllGroupsForAdmin() {
+  const institute = await requireInstitute();
   const rows = await db.query.groups.findMany({
+    where: eq(groups.instituteId, institute),
     orderBy: (g, { asc }) => [asc(g.name)],
     with: {
       program: true,
@@ -33,6 +36,7 @@ export async function getAllGroupsForAdmin() {
       next: sql<Date | null>`min(${sessions.scheduledAt}) filter (where ${sessions.scheduledAt} >= now() and ${sessions.status} = 'planned')`,
     })
     .from(sessions)
+    .where(eq(sessions.instituteId, institute))
     .groupBy(sessions.groupId);
 
   const byGroup = new Map(
@@ -57,8 +61,9 @@ export async function getAllGroupsForAdmin() {
 
 /** Détail d'un groupe : membres, séances récentes, assiduité. */
 export async function getGroupById(groupId: string) {
+  const institute = await requireInstitute();
   const group = await db.query.groups.findFirst({
-    where: eq(groups.id, groupId),
+    where: and(eq(groups.id, groupId), eq(groups.instituteId, institute)),
     with: {
       program: true,
       staffMember: true,
@@ -72,7 +77,10 @@ export async function getGroupById(groupId: string) {
 
   const [groupSessions, upcoming] = await Promise.all([
     db.query.sessions.findMany({
-      where: eq(sessions.groupId, groupId),
+      where: and(
+        eq(sessions.groupId, groupId),
+        eq(sessions.instituteId, institute)
+      ),
       orderBy: (s, { desc }) => [desc(s.scheduledAt)],
       with: { participants: true, staffMember: { columns: { name: true } } },
     }),
@@ -81,7 +89,8 @@ export async function getGroupById(groupId: string) {
     db.query.sessions.findMany({
       where: and(
         eq(sessions.groupId, groupId),
-        gte(sessions.scheduledAt, new Date())
+        gte(sessions.scheduledAt, new Date()),
+        eq(sessions.instituteId, institute)
       ),
       orderBy: [asc(sessions.scheduledAt)],
       limit: 5,
@@ -98,8 +107,12 @@ export async function getGroupById(groupId: string) {
 
 /** Groupes actifs, pour les listes déroulantes. */
 export async function getActiveGroupsForSelect() {
+  const institute = await requireInstitute();
   return db.query.groups.findMany({
-    where: eq(groups.status, "active"),
+    where: and(
+      eq(groups.status, "active"),
+      eq(groups.instituteId, institute)
+    ),
     orderBy: (g, { asc }) => [asc(g.name)],
     columns: { id: true, name: true },
   });
@@ -107,8 +120,12 @@ export async function getActiveGroupsForSelect() {
 
 /** Identifiants des élèves membres d'un groupe. */
 export async function getGroupMemberIds(groupId: string): Promise<string[]> {
+  const institute = await requireInstitute();
   const rows = await db.query.groupMembers.findMany({
-    where: eq(groupMembers.groupId, groupId),
+    where: and(
+      eq(groupMembers.groupId, groupId),
+      eq(groupMembers.instituteId, institute)
+    ),
     columns: { studentProfileId: true },
   });
   return rows.map((row) => row.studentProfileId);

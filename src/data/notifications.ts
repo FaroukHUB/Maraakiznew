@@ -1,4 +1,3 @@
-import { db } from "@/db";
 import { getSessionsNeedingAttendance } from "@/data/attendance";
 import { getDueReviewCount } from "@/data/memorization";
 import { getOutstandingTotal } from "@/data/invoices";

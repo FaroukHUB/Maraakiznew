@@ -3,9 +3,10 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { documents } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { documents, CAPABILITIES } from "@/db/schema";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -22,6 +23,7 @@ export async function createDocument(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
 
     // Le lien doit être une adresse web : on ne stocke pas le fichier.
@@ -43,6 +45,7 @@ export async function createDocument(data: {
     }
 
     await db.insert(documents).values({
+      instituteId: institute,
       title: data.title.trim(),
       type: data.type,
       studentProfileId: data.studentProfileId || null,
@@ -62,7 +65,8 @@ export async function createDocument(data: {
 export async function deleteDocument(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
-    await db.delete(documents).where(eq(documents.id, id));
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
+    await db.delete(documents).where(and(eq(documents.instituteId, institute), eq(documents.id, id)));
     revalidatePath("/admin/documents");
     return { success: true };
   } catch {

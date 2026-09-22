@@ -3,9 +3,10 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { users, studentProfiles, payments, subscriptions } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { users, studentProfiles, payments, subscriptions, CAPABILITIES } from "@/db/schema";
 import { isValidTimezone } from "@/lib/timezones";
 import { countryByCode } from "@/lib/countries";
 
@@ -32,6 +33,7 @@ export async function createStudent(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     // Check duplicate email
     const existing = await db.query.users.findFirst({
       where: eq(users.email, data.email),
@@ -56,6 +58,7 @@ export async function createStudent(data: {
     const [profile] = await db
       .insert(studentProfiles)
       .values({
+        instituteId: institute,
         userId: user.id,
         whatsappPhone: data.whatsappPhone || null,
         localPhone: data.localPhone || null,
@@ -104,8 +107,9 @@ export async function updateStudentProfile(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const profile = await db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, profileId),
+      where: and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, profileId)),
     });
     if (!profile) return { success: false, error: "Profil introuvable." };
 
@@ -144,7 +148,12 @@ export async function updateStudentProfile(
         ...(data.notes !== undefined && { notes: data.notes || null }),
         updatedAt: new Date(),
       })
-      .where(eq(studentProfiles.id, profileId));
+      .where(
+        and(
+          eq(studentProfiles.instituteId, institute),
+          eq(studentProfiles.id, profileId)
+        )
+      );
 
     // Le fuseau d'une élève change ce que montre le TABLEAU DE BORD (le
     // bloc des fuseaux) et tout l'espace de cette élève, pas seulement sa
@@ -211,10 +220,11 @@ export async function setStudentStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const [updated] = await db
       .update(studentProfiles)
       .set({ status, updatedAt: new Date() })
-      .where(eq(studentProfiles.id, profileId))
+      .where(and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, profileId)))
       .returning({ id: studentProfiles.id });
 
     if (!updated) return { success: false, error: "Profil introuvable." };
@@ -247,20 +257,31 @@ export async function setStudentStatus(
 export async function deleteStudent(profileId: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const profile = await db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, profileId),
+      where: and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, profileId)),
     });
     if (!profile) return { success: false, error: "Profil introuvable." };
 
     const [paid] = await db
       .select({ id: payments.id })
       .from(payments)
-      .where(eq(payments.studentProfileId, profileId))
+      .where(
+        and(
+          eq(payments.studentProfileId, profileId),
+          eq(payments.instituteId, institute)
+        )
+      )
       .limit(1);
     const [subscribed] = await db
       .select({ id: subscriptions.id })
       .from(subscriptions)
-      .where(eq(subscriptions.studentProfileId, profileId))
+      .where(
+        and(
+          eq(subscriptions.studentProfileId, profileId),
+          eq(subscriptions.instituteId, institute)
+        )
+      )
       .limit(1);
 
     if (paid || subscribed) {

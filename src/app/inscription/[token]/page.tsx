@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getSettings } from "@/data/settings";
-import { checkRegistrationToken } from "@/actions/registration";
+import { resolveRegistrationInstitute } from "@/actions/registration";
 import { RegistrationForm } from "./form";
 
 /**
@@ -25,10 +25,13 @@ export default async function RegistrationPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const [valid, institute] = await Promise.all([
-    checkRegistrationToken(token),
-    getSettings(),
-  ]);
+  // C'est le JETON qui désigne l'établissement : la page publique n'a pas
+  // de session, et doit afficher le nom de l'institut qui a ouvert ce
+  // lien, pas celui d'un autre. Jeton inconnu : page neutre, réglages de
+  // l'établissement d'origine, et aucune indication de plus.
+  const found = await resolveRegistrationInstitute(token);
+  const valid = found !== null;
+  const institute = await getSettings(found ?? undefined);
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-12">

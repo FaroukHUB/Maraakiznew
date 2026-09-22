@@ -3,9 +3,10 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { certificates, studentProfiles, mentionForScore } from "@/db/schema";
+import { assertCapability } from "@/lib/tenant";
+import { certificates, studentProfiles, mentionForScore, CAPABILITIES } from "@/db/schema";
 import {
   computeCertificateBasis,
   nextCertificateReference,
@@ -23,10 +24,11 @@ export async function createCertificate(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
 
     const student = await db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, data.studentProfileId),
+      where: and(eq(studentProfiles.instituteId, institute), eq(studentProfiles.id, data.studentProfileId)),
     });
     if (!student) return { success: false, error: "Élève introuvable." };
 
@@ -38,6 +40,7 @@ export async function createCertificate(data: {
     const [created] = await db
       .insert(certificates)
       .values({
+        instituteId: institute,
         studentProfileId: data.studentProfileId,
         programId: data.programId || null,
         title: data.title.trim(),
@@ -64,8 +67,9 @@ export async function createCertificate(data: {
 export async function refreshCertificate(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const certificate = await db.query.certificates.findFirst({
-      where: eq(certificates.id, id),
+      where: and(eq(certificates.instituteId, institute), eq(certificates.id, id)),
     });
     if (!certificate) return { success: false, error: "Diplôme introuvable." };
     if (certificate.status !== "draft") {
@@ -92,7 +96,7 @@ export async function refreshCertificate(id: string): Promise<ActionResult> {
           | "excellent",
         updatedAt: new Date(),
       })
-      .where(eq(certificates.id, id));
+      .where(and(eq(certificates.instituteId, institute), eq(certificates.id, id)));
 
     revalidatePath(`/admin/certificates/${id}`);
     return { success: true };
@@ -107,10 +111,11 @@ export async function updateCertificateComment(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     await db
       .update(certificates)
       .set({ comment: comment.trim() || null, updatedAt: new Date() })
-      .where(eq(certificates.id, id));
+      .where(and(eq(certificates.instituteId, institute), eq(certificates.id, id)));
 
     revalidatePath(`/admin/certificates/${id}`);
     revalidatePath("/student/certificates");
@@ -127,8 +132,9 @@ export async function updateCertificateComment(
 export async function issueCertificate(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const certificate = await db.query.certificates.findFirst({
-      where: eq(certificates.id, id),
+      where: and(eq(certificates.instituteId, institute), eq(certificates.id, id)),
     });
     if (!certificate) return { success: false, error: "Diplôme introuvable." };
     if (certificate.status !== "draft") {
@@ -141,7 +147,7 @@ export async function issueCertificate(id: string): Promise<ActionResult> {
     await db
       .update(certificates)
       .set({ status: "issued", reference, issuedOn: now, updatedAt: now })
-      .where(eq(certificates.id, id));
+      .where(and(eq(certificates.instituteId, institute), eq(certificates.id, id)));
 
     revalidatePath("/admin/certificates");
     revalidatePath(`/admin/certificates/${id}`);
@@ -164,8 +170,9 @@ export async function revokeCertificate(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const certificate = await db.query.certificates.findFirst({
-      where: eq(certificates.id, id),
+      where: and(eq(certificates.instituteId, institute), eq(certificates.id, id)),
     });
     if (!certificate) return { success: false, error: "Diplôme introuvable." };
     if (!reason.trim()) {
@@ -180,7 +187,7 @@ export async function revokeCertificate(
         revocationReason: reason.trim(),
         updatedAt: new Date(),
       })
-      .where(eq(certificates.id, id));
+      .where(and(eq(certificates.instituteId, institute), eq(certificates.id, id)));
 
     revalidatePath("/admin/certificates");
     revalidatePath(`/admin/certificates/${id}`);
@@ -194,8 +201,9 @@ export async function revokeCertificate(
 export async function deleteCertificate(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.studentsManage);
     const certificate = await db.query.certificates.findFirst({
-      where: eq(certificates.id, id),
+      where: and(eq(certificates.instituteId, institute), eq(certificates.id, id)),
     });
     if (!certificate) return { success: false, error: "Diplôme introuvable." };
     if (certificate.status !== "draft") {
@@ -205,7 +213,7 @@ export async function deleteCertificate(id: string): Promise<ActionResult> {
       };
     }
 
-    await db.delete(certificates).where(eq(certificates.id, id));
+    await db.delete(certificates).where(and(eq(certificates.instituteId, institute), eq(certificates.id, id)));
 
     revalidatePath("/admin/certificates");
     return { success: true };

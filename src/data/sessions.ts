@@ -1,5 +1,6 @@
 import { eq, and, gt, gte, lt, sql, inArray, desc, asc } from "drizzle-orm";
 import { db } from "@/db";
+import { requireInstitute } from "@/lib/tenant";
 import { pendingReason } from "@/data/attendance";
 import {
   sessions,
@@ -14,15 +15,23 @@ import {
 export async function getSessionsByPackId(
   subscriptionId: string
 ): Promise<(typeof sessions.$inferSelect)[]> {
+  const institute = await requireInstitute();
   return db.query.sessions.findMany({
-    where: eq(sessions.subscriptionId, subscriptionId),
+    where: and(
+      eq(sessions.subscriptionId, subscriptionId),
+      eq(sessions.instituteId, institute)
+    ),
     orderBy: (s, { asc }) => [asc(s.sessionNumber)],
   });
 }
 
 export async function getSessionById(sessionId: string) {
+  const institute = await requireInstitute();
   return db.query.sessions.findFirst({
-    where: eq(sessions.id, sessionId),
+    where: and(
+      eq(sessions.id, sessionId),
+      eq(sessions.instituteId, institute)
+    ),
     with: {
       notes: true,
       participants: {
@@ -34,11 +43,13 @@ export async function getSessionById(sessionId: string) {
 }
 
 export async function getUpcomingSessions(limit: number = 5) {
+  const institute = await requireInstitute();
   const now = new Date();
   return db.query.sessions.findMany({
     where: and(
       eq(sessions.status, "planned"),
-      gt(sessions.scheduledAt, now)
+      gt(sessions.scheduledAt, now),
+      eq(sessions.instituteId, institute)
     ),
     orderBy: (s, { asc }) => [asc(s.scheduledAt)],
     limit,
@@ -81,6 +92,7 @@ export async function getConsumedSessionCounts(
   subscriptionIds: string[]
 ): Promise<{ subscriptionId: string; consumed: number }[]> {
   if (subscriptionIds.length === 0) return [];
+  const institute = await requireInstitute();
 
   const owned = await db
     .select({
@@ -91,7 +103,8 @@ export async function getConsumedSessionCounts(
     .where(
       and(
         inArray(sessions.subscriptionId, subscriptionIds),
-        inArray(sessions.status, [...CONSUMING_STATUSES])
+        inArray(sessions.status, [...CONSUMING_STATUSES]),
+        eq(sessions.instituteId, institute)
       )
     )
     .groupBy(sessions.subscriptionId);
@@ -110,7 +123,8 @@ export async function getConsumedSessionCounts(
         inArray(sessions.status, [...CONSUMING_STATUSES]),
         inArray(sessionParticipants.attendanceStatus, [
           ...CONSUMING_ATTENDANCE_STATUSES,
-        ])
+        ]),
+        eq(sessionParticipants.instituteId, institute)
       )
     )
     .groupBy(sessionParticipants.subscriptionId);
@@ -138,8 +152,12 @@ export async function getConsumedSessionCounts(
 export async function getSubscriptionIdsAffectedBySession(
   sessionId: string
 ): Promise<string[]> {
+  const institute = await requireInstitute();
   const session = await db.query.sessions.findFirst({
-    where: eq(sessions.id, sessionId),
+    where: and(
+      eq(sessions.id, sessionId),
+      eq(sessions.instituteId, institute)
+    ),
     with: { participants: true },
   });
   if (!session) return [];
@@ -161,13 +179,18 @@ export async function getSubscriptionIdsAffectedBySession(
  * voir ce qui reste à faire de l'appel. Ce commentaire fait foi.
  */
 export async function getTodaySessions() {
+  const institute = await requireInstitute();
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
 
   return db.query.sessions.findMany({
-    where: and(gte(sessions.scheduledAt, start), lt(sessions.scheduledAt, end)),
+    where: and(
+      gte(sessions.scheduledAt, start),
+      lt(sessions.scheduledAt, end),
+      eq(sessions.instituteId, institute)
+    ),
     orderBy: (s, { asc }) => [asc(s.scheduledAt)],
     with: {
       subscription: {
@@ -182,6 +205,7 @@ export async function getTodaySessions() {
 }
 
 export async function getWeekSessionCount(): Promise<number> {
+  const institute = await requireInstitute();
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay() + 1);
@@ -195,17 +219,20 @@ export async function getWeekSessionCount(): Promise<number> {
     .where(
       and(
         gt(sessions.scheduledAt, startOfWeek),
-        sql`${sessions.scheduledAt} < ${endOfWeek}`
+        sql`${sessions.scheduledAt} < ${endOfWeek}`,
+        eq(sessions.instituteId, institute)
       )
     );
   return Number(result[0].count);
 }
 
 export async function getLastCompletedSession(subscriptionId: string) {
+  const institute = await requireInstitute();
   const result = await db.query.sessions.findFirst({
     where: and(
       eq(sessions.subscriptionId, subscriptionId),
-      eq(sessions.status, "completed")
+      eq(sessions.status, "completed"),
+      eq(sessions.instituteId, institute)
     ),
     orderBy: (s, { desc }) => [desc(s.scheduledAt)],
     with: { notes: true },
@@ -227,8 +254,10 @@ export async function getLastCompletedSession(subscriptionId: string) {
  * sans compte rendu attend le sien. Ce commentaire fait foi.
  */
 export async function getAllSessionsForAdmin() {
+  const institute = await requireInstitute();
   const now = Date.now();
   const rows = await db.query.sessions.findMany({
+    where: eq(sessions.instituteId, institute),
     orderBy: (s, { desc }) => [desc(s.scheduledAt)],
     with: {
       subscription: {
@@ -272,8 +301,12 @@ export async function getAllSessionsForAdmin() {
  * rang dans le forfait, pas un compteur de séances faites.
  */
 export async function getActiveSubscriptionsForSelect() {
+  const institute = await requireInstitute();
   const rows = await db.query.subscriptions.findMany({
-    where: eq(subscriptions.status, "active"),
+    where: and(
+      eq(subscriptions.status, "active"),
+      eq(subscriptions.instituteId, institute)
+    ),
     with: {
       studentProfile: { with: { user: true } },
       program: true,
@@ -306,8 +339,12 @@ export async function getActiveSubscriptionsForSelect() {
 }
 
 export async function getSessionWithFullDetails(sessionId: string) {
+  const institute = await requireInstitute();
   return db.query.sessions.findFirst({
-    where: eq(sessions.id, sessionId),
+    where: and(
+      eq(sessions.id, sessionId),
+      eq(sessions.instituteId, institute)
+    ),
     with: {
       subscription: {
         with: {
@@ -329,8 +366,12 @@ export async function getSessionWithFullDetails(sessionId: string) {
 // ─── Student query (access-checked at page level) ───────
 
 export async function getStudentSessionDetail(sessionId: string, studentProfileId: string) {
+  const institute = await requireInstitute();
   const session = await db.query.sessions.findFirst({
-    where: eq(sessions.id, sessionId),
+    where: and(
+      eq(sessions.id, sessionId),
+      eq(sessions.instituteId, institute)
+    ),
     with: {
       subscription: {
         with: { program: true },
@@ -369,9 +410,15 @@ export async function getStudentSessionDetail(sessionId: string, studentProfileI
 }
 
 export async function getNextSessionNumber(subscriptionId: string): Promise<number> {
+  const institute = await requireInstitute();
   const result = await db
     .select({ max: sql<number>`coalesce(max(${sessions.sessionNumber}), 0)` })
     .from(sessions)
-    .where(eq(sessions.subscriptionId, subscriptionId));
+    .where(
+      and(
+        eq(sessions.subscriptionId, subscriptionId),
+        eq(sessions.instituteId, institute)
+      )
+    );
   return Number(result[0].max) + 1;
 }

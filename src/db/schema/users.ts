@@ -9,7 +9,7 @@ import {
 
 // ─── Enums ───────────────────────────────────────────────
 
-export const userRoleEnum = pgEnum("user_role", ["admin", "student"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "student", "staff"]);
 
 // ─── Table ───────────────────────────────────────────────
 

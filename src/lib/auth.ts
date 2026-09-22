@@ -14,10 +14,10 @@
  */
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { authConfig } from "./auth.config";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, instituteMembers, capabilitiesOf } from "@/db/schema";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -57,11 +57,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // ignoré volontairement
         }
 
+        /*
+          Les appartenances sont lues UNE fois, à la connexion, et
+          portées par le jeton. Un changement d'appartenance ne prend
+          donc effet qu'à la reconnexion suivante — c'est voulu : le
+          middleware doit pouvoir décider sans toucher la base. Le
+          contrôle fin, lui, relit la base à chaque action.
+          Ce commentaire fait foi.
+        */
+        const memberships = await db.query.instituteMembers.findMany({
+          where: and(
+            eq(instituteMembers.userId, user.id),
+            eq(instituteMembers.status, "active")
+          ),
+        });
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
+          memberships: memberships.map((member) => ({
+            instituteId: member.instituteId,
+            role: member.role,
+            capabilities: capabilitiesOf(member),
+          })),
         };
       },
     }),

@@ -3,20 +3,32 @@
 import { assertAdmin } from "@/lib/guards";
 
 import { revalidatePath } from "next/cache";
-import { eq, and, ne } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { posts, slugify } from "@/db/schema";
+import { assertCapability, requireInstitute } from "@/lib/tenant";
+import { posts, slugify, CAPABILITIES } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth-utils";
 
 type ActionResult =
   | { success: true; id?: string }
   | { success: false; error: string };
 
+/**
+ * Ce raccourci est-il déjà pris DANS cet établissement ?
+ *
+ * Deux instituts peuvent avoir chacun leur article « ramadan » : le
+ * raccourci n'est unique qu'à l'intérieur d'un établissement, sinon le
+ * premier arrivé confisquerait les mots courants à tous les autres.
+ * Ce commentaire fait foi.
+ */
 async function slugTaken(slug: string, exceptId?: string): Promise<boolean> {
+  const institute = await requireInstitute();
   const existing = await db.query.posts.findFirst({
-    where: exceptId
-      ? and(eq(posts.slug, slug), ne(posts.id, exceptId))
-      : eq(posts.slug, slug),
+    where: and(
+      eq(posts.instituteId, institute),
+      eq(posts.slug, slug),
+      ...(exceptId ? [ne(posts.id, exceptId)] : [])
+    ),
   });
   return Boolean(existing);
 }
@@ -29,6 +41,7 @@ export async function createPost(data: {
 }): Promise<ActionResult> {
   try {
     await assertAdmin();
+    const institute = await assertCapability(CAPABILITIES.contentManage);
     if (!data.title.trim()) return { success: false, error: "Le titre est obligatoire." };
     if (!data.content.trim()) return { success: false, error: "Le contenu est obligatoire." };
 
@@ -48,6 +61,7 @@ export async function createPost(data: {
     const [created] = await db
       .insert(posts)
       .values({
+        instituteId: institute,
         title: data.title.trim(),
         slug,
         content: data.content.trim(),
@@ -77,7 +91,9 @@ export async function updatePost(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const post = await db.query.posts.findFirst({ where: eq(posts.id, id) });
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    const post = await db.query.posts.findFirst({
+      where: and(eq(posts.instituteId, institute), eq(posts.id, id))});
     if (!post) return { success: false, error: "Article introuvable." };
 
     let slug = post.slug;
@@ -99,7 +115,7 @@ export async function updatePost(
         ...(data.pinned !== undefined && { pinned: data.pinned }),
         updatedAt: new Date(),
       })
-      .where(eq(posts.id, id));
+      .where(and(eq(posts.instituteId, institute), eq(posts.id, id)));
 
     revalidatePath("/admin/blog");
     revalidatePath(`/admin/blog/${id}`);
@@ -116,7 +132,9 @@ export async function setPostStatus(
 ): Promise<ActionResult> {
   try {
     await assertAdmin();
-    const post = await db.query.posts.findFirst({ where: eq(posts.id, id) });
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    const post = await db.query.posts.findFirst({
+      where: and(eq(posts.instituteId, institute), eq(posts.id, id))});
     if (!post) return { success: false, error: "Article introuvable." };
 
     await db
@@ -129,7 +147,7 @@ export async function setPostStatus(
           status === "published" ? post.publishedAt ?? new Date() : post.publishedAt,
         updatedAt: new Date(),
       })
-      .where(eq(posts.id, id));
+      .where(and(eq(posts.instituteId, institute), eq(posts.id, id)));
 
     revalidatePath("/admin/blog");
     revalidatePath("/student/blog");
@@ -142,7 +160,8 @@ export async function setPostStatus(
 export async function deletePost(id: string): Promise<ActionResult> {
   try {
     await assertAdmin();
-    await db.delete(posts).where(eq(posts.id, id));
+    const institute = await assertCapability(CAPABILITIES.contentManage);
+    await db.delete(posts).where(and(eq(posts.instituteId, institute), eq(posts.id, id)));
     revalidatePath("/admin/blog");
     revalidatePath("/student/blog");
     return { success: true };

@@ -12,6 +12,7 @@ import {
 import { programs } from "./programs";
 import { studentProfiles } from "./student-profiles";
 import { sessions } from "./sessions";
+import { institutes, DEFAULT_INSTITUTE_ID } from "./institutes";
 
 // ─── Enums ───────────────────────────────────────────────
 
@@ -50,6 +51,11 @@ export const ACQUIRED_STATUS = "acquired" as const;
 
 export const skills = pgTable("skills", {
   id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
   programId: uuid("program_id")
     .references(() => programs.id, { onDelete: "cascade" })
     .notNull(),
@@ -74,6 +80,11 @@ export const skillProgress = pgTable(
   "skill_progress",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+  /** L'établissement propriétaire. Voir `schema/institutes.ts`. */
+  instituteId: uuid("institute_id")
+    .references(() => institutes.id, { onDelete: "cascade" })
+    .notNull()
+    .default(DEFAULT_INSTITUTE_ID),
     studentProfileId: uuid("student_profile_id")
       .references(() => studentProfiles.id, { onDelete: "cascade" })
       .notNull(),

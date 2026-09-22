@@ -1,6 +1,7 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { assessments, assessmentResults, scorePercentage } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 
 // Réexport de commodité pour les composants serveur. Les composants
 // CLIENT doivent importer depuis @/lib/constants : passer par ce fichier
@@ -8,7 +9,9 @@ import { assessments, assessmentResults, scorePercentage } from "@/db/schema";
 export { ASSESSMENT_TYPE_LABELS as TYPE_LABELS } from "@/lib/constants";
 
 export async function getAssessmentsForAdmin() {
+  const institute = await requireInstitute();
   const list = await db.query.assessments.findMany({
+    where: eq(assessments.instituteId, institute),
     orderBy: [desc(assessments.heldOn)],
     with: { program: true, group: true, results: true },
   });
@@ -37,8 +40,12 @@ export async function getAssessmentsForAdmin() {
  * d'un coup d'œil qui décroche.
  */
 export async function getAssessmentById(id: string) {
+  const institute = await requireInstitute();
   const assessment = await db.query.assessments.findFirst({
-    where: eq(assessments.id, id),
+    where: and(
+      eq(assessments.id, id),
+      eq(assessments.instituteId, institute)
+    ),
     with: {
       program: true,
       group: true,
@@ -62,8 +69,12 @@ export async function getAssessmentById(id: string) {
 
 /** Résultats d'une élève — uniquement les évaluations publiées. */
 export async function getResultsForStudent(studentProfileId: string) {
+  const institute = await requireInstitute();
   const rows = await db.query.assessmentResults.findMany({
-    where: eq(assessmentResults.studentProfileId, studentProfileId),
+    where: and(
+      eq(assessmentResults.studentProfileId, studentProfileId),
+      eq(assessmentResults.instituteId, institute)
+    ),
     with: { assessment: { with: { program: true } } },
     orderBy: [desc(assessmentResults.gradedAt)],
   });
@@ -87,9 +98,15 @@ export async function getStudentAverage(
 }
 
 export async function getAssessmentCount(): Promise<number> {
+  const institute = await requireInstitute();
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
     .from(assessments)
-    .where(eq(assessments.status, "draft"));
+    .where(
+      and(
+        eq(assessments.status, "draft"),
+        eq(assessments.instituteId, institute)
+      )
+    );
   return Number(row?.count ?? 0);
 }

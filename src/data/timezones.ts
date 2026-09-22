@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
+import { requireInstitute } from "@/lib/tenant";
 import { getInstituteTimezone } from "@/data/settings";
 import { isValidTimezone, zoneLabel } from "@/lib/timezones";
 
@@ -30,9 +31,13 @@ export async function getStudentZones(): Promise<{
   instituteZone: string;
   zones: ZonePresence[];
 }> {
+  const institute = await requireInstitute();
   const [instituteZone, profiles] = await Promise.all([
     getInstituteTimezone(),
-    db.query.studentProfiles.findMany({ with: { user: true } }),
+    db.query.studentProfiles.findMany({
+      where: eq(studentProfiles.instituteId, institute),
+      with: { user: true },
+    }),
   ]);
 
   const byZone = new Map<string, string[]>();
@@ -80,10 +85,14 @@ export async function getStudentZones(): Promise<{
 export async function getTimezoneForStudent(
   studentProfileId: string
 ): Promise<string> {
+  const institute = await requireInstitute();
   const [instituteZone, profile] = await Promise.all([
     getInstituteTimezone(),
     db.query.studentProfiles.findFirst({
-      where: eq(studentProfiles.id, studentProfileId),
+      where: and(
+        eq(studentProfiles.id, studentProfileId),
+        eq(studentProfiles.instituteId, institute)
+      ),
       columns: { timezone: true },
     }),
   ]);
@@ -101,8 +110,12 @@ export async function getTimezoneForStudent(
  * n'est pas une erreur : c'est le cas de l'administration.
  */
 export async function getViewerTimezone(userId: string): Promise<string> {
+  const institute = await requireInstitute();
   const profile = await db.query.studentProfiles.findFirst({
-    where: eq(studentProfiles.userId, userId),
+    where: and(
+      eq(studentProfiles.userId, userId),
+      eq(studentProfiles.instituteId, institute)
+    ),
     columns: { timezone: true },
   });
 
