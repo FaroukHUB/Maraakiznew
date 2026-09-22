@@ -18,6 +18,19 @@
  *
  * Sans DATABASE_URL, le lanceur ne fait rien et n'échoue pas : cela
  * permet un build hors ligne.
+ *
+ * ── Les migrations EN ATTENTE ──
+ *
+ * Sur ce projet, `production`, `preview` et `development` partagent une
+ * seule base : une préversion migre donc la production. Certaines
+ * migrations ne doivent pas partir tant que l'institut ne l'a pas
+ * décidé, ou tant que la base de préversion n'est pas séparée. Elles
+ * sont NOMMÉES ci-dessous, et le lanceur les saute en le DISANT — il ne
+ * fait jamais semblant de les avoir appliquées.
+ *
+ * Pour les autoriser : poser `MIGRATIONS_AUTORISEES` sur l'environnement
+ * concerné, avec les noms séparés par des virgules, ou `toutes`. Ce
+ * commentaire fait foi.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -30,6 +43,30 @@ const MIGRATIONS_DIR = join(process.cwd(), "drizzle");
  * `ON DELETE CASCADE` à l'intérieur d'une clé étrangère est une règle
  * de référence, pas une suppression, et reste autorisé.
  */
+/**
+ * Migrations qui attendent une décision explicite.
+ *
+ * Le multi-établissements ajoute une colonne et des contraintes à 39
+ * tables. C'est additif et sans perte, mais cela MODIFIE la base
+ * partagée avec la production — ce qui n'a pas été autorisé. Tant que
+ * `MIGRATIONS_AUTORISEES` ne les nomme pas, elles ne partent pas.
+ */
+const EN_ATTENTE = [
+  "0009_etablissements.sql",
+  "0010_role_staff.sql",
+  "0011_cloisonnement_par_la_base.sql",
+];
+
+/** Cette migration est-elle autorisée sur CET environnement ? */
+function autorisee(file: string): boolean {
+  if (!EN_ATTENTE.includes(file)) return true;
+  const allowed = (process.env.MIGRATIONS_AUTORISEES ?? "")
+    .split(",")
+    .map((n) => n.trim())
+    .filter(Boolean);
+  return allowed.includes("toutes") || allowed.includes(file);
+}
+
 const FORBIDDEN = [
   /(^|;)\s*DROP\s+/i,
   /(^|;)\s*TRUNCATE\s+/i,
@@ -101,6 +138,15 @@ async function main() {
     for (const file of files) {
       if (applied.has(file)) {
         console.log(`migrate: ${file} déjà appliquée.`);
+        continue;
+      }
+
+      if (!autorisee(file)) {
+        console.log(
+          `migrate: ${file} EN ATTENTE — non appliquée. ` +
+            "Elle modifierait la base partagée avec la production. " +
+            "Pour l'autoriser : MIGRATIONS_AUTORISEES=toutes sur cet environnement."
+        );
         continue;
       }
 

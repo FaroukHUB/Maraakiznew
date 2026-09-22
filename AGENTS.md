@@ -480,6 +480,17 @@ les migrations sont additives.
 `npm run db:seed` **efface tout** avant de repeupler. Il ne doit jamais
 être lancé sur la base partagée sans décision explicite de l'institut.
 
+**Les migrations du lot 0 sont EN ATTENTE.** `src/db/migrate.ts` nomme
+`0009`, `0010` et `0011` : elles ne partent pas tant que
+`MIGRATIONS_AUTORISEES` ne les autorise pas sur l'environnement
+(`toutes`, ou leurs noms séparés par des virgules). Le lanceur le DIT
+dans le journal du build — il ne fait jamais semblant de les avoir
+appliquées. Raison : elles modifieraient la base partagée avec la
+production, ce qui n'a pas été autorisé. Conséquence assumée : **tant
+que le verrou tient, une préversion déployée depuis cette branche ne
+fonctionne pas** — le code interroge des colonnes que la base partagée
+n'a pas encore. Vérifié dans les deux sens sur une base neuve.
+
 **Base de préversion distincte — ce qui manque.** La séparer demande deux
 choses que ce dépôt ne peut pas produire seul :
 
