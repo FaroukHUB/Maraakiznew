@@ -480,16 +480,25 @@ les migrations sont additives.
 `npm run db:seed` **efface tout** avant de repeupler. Il ne doit jamais
 être lancé sur la base partagée sans décision explicite de l'institut.
 
-**Les migrations du lot 0 sont EN ATTENTE.** `src/db/migrate.ts` nomme
-`0009`, `0010` et `0011` : elles ne partent pas tant que
-`MIGRATIONS_AUTORISEES` ne les autorise pas sur l'environnement
-(`toutes`, ou leurs noms séparés par des virgules). Le lanceur le DIT
-dans le journal du build — il ne fait jamais semblant de les avoir
-appliquées. Raison : elles modifieraient la base partagée avec la
-production, ce qui n'a pas été autorisé. Conséquence assumée : **tant
-que le verrou tient, une préversion déployée depuis cette branche ne
-fonctionne pas** — le code interroge des colonnes que la base partagée
-n'a pas encore. Vérifié dans les deux sens sur une base neuve.
+**Mettre une migration en attente.** `src/db/migrate.ts` tient une liste
+`EN_ATTENTE` : un fichier qui y figure n'est pas appliqué tant que
+`MIGRATIONS_AUTORISEES` ne le nomme pas (`toutes`, ou les noms séparés
+par des virgules), et le lanceur le DIT dans le journal du build — il ne
+fait jamais semblant. C'est le geste à faire quand un changement, même
+additif, touche la base partagée et demande l'accord de l'institut.
+
+La liste est aujourd'hui vide : le lot 0 (`0009`, `0010`, `0011`) y a
+figuré, l'institut a donné son accord le 22 septembre 2026, et
+l'autorisation a été écrite dans le code plutôt que posée en variable
+d'environnement — une variable oubliée sur la production ferait sauter
+la migration, et l'application interrogerait des colonnes absentes.
+
+**Les migrations du lot 0 ont été appliquées sur la base partagée**
+(donc sur la production), avec cet accord. Idempotence vérifiée trois
+fois sur une base neuve avant envoi : 39 colonnes `institute_id`, 52
+clés étrangères composées, aucune erreur. Aucune donnée existante
+supprimée ni modifiée : les lignes d'origine reçoivent l'établissement
+d'origine par la valeur par défaut.
 
 **Base de préversion distincte — ce qui manque.** La séparer demande deux
 choses que ce dépôt ne peut pas produire seul :

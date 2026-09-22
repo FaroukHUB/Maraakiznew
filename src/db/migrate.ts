@@ -46,16 +46,23 @@ const MIGRATIONS_DIR = join(process.cwd(), "drizzle");
 /**
  * Migrations qui attendent une décision explicite.
  *
- * Le multi-établissements ajoute une colonne et des contraintes à 39
- * tables. C'est additif et sans perte, mais cela MODIFIE la base
- * partagée avec la production — ce qui n'a pas été autorisé. Tant que
- * `MIGRATIONS_AUTORISEES` ne les nomme pas, elles ne partent pas.
+ * Une migration nommée ici ne part pas, quel que soit l'environnement,
+ * tant que `MIGRATIONS_AUTORISEES` ne la nomme pas en retour. Sert
+ * lorsqu'un changement, même additif, touche la base partagée avec la
+ * production et demande l'accord de l'institut.
+ *
+ * ── Pourquoi la liste est VIDE ──
+ *
+ * Le multi-établissements (0009, 0010, 0011) y figurait ; l'institut a
+ * donné son accord, la liste est donc vidée plutôt que contournée par
+ * une variable d'environnement. Une autorisation portée par une
+ * variable devrait être posée sur CHAQUE environnement : oubliée sur la
+ * production, le build sauterait la migration et l'application
+ * interrogerait des colonnes absentes. Ce qui est décidé s'écrit dans
+ * le code, pas dans un réglage qu'on peut oublier ailleurs.
+ * Ce commentaire fait foi.
  */
-const EN_ATTENTE = [
-  "0009_etablissements.sql",
-  "0010_role_staff.sql",
-  "0011_cloisonnement_par_la_base.sql",
-];
+const EN_ATTENTE: string[] = [];
 
 /** Cette migration est-elle autorisée sur CET environnement ? */
 function autorisee(file: string): boolean {
